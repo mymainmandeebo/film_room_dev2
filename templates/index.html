@@ -487,6 +487,38 @@
     html.compact [class~="mt-4"] { margin-top: 0.6rem !important; }
     html.compact [class~="mb-2"] { margin-bottom: 0.3rem !important; }
 
+    /* --- Alignment helpers ---
+       Keep icon-only buttons at a consistent hit-target height with their
+       labeled neighbors, and align quick-toggle rows so wrapped items
+       still line up on a common baseline. */
+    .icon-btn-square {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .action-row > * {
+      min-height: 36px;
+    }
+    .quick-toggle-row {
+      align-items: center;
+      row-gap: 6px;
+      column-gap: 6px;
+    }
+    .quick-toggle-row .quick-toggle-btn,
+    .quick-toggle-row .playtype-toggle-btn {
+      height: 30px;
+    }
+
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #79747E; border-radius: 4px; }
