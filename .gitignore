@@ -1,0 +1,20 @@
+# Ignore uploaded videos, cut clips, stitched reels, and temp files
+data/uploads/
+data/clips/
+data/reels/
+data/logos/
+data/*.txt
+data/store.json
+
+# Optional: Ignore store.json if you don't want your private credentials/data on GitHub
+# data/store.json
+
+# Ignore Python cache & virtual environment
+__pycache__/
+*.pyc
+.env
+venv/
+.venv/
+
+# System files
+.DS_Store

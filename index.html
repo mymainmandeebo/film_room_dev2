@@ -1,0 +1,65 @@
+  <!-- ================= EDIT USER MODAL (RBAC & PW RESET) ================= -->
+  <div id="editUserModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 hidden backdrop-blur-sm">
+    <div class="md-dialog bg-md-surface-container-lowest dark:bg-md-dark-surface-container-low border border-md-outline-variant dark:border-md-dark-outline-variant shadow-md-3 w-full max-w-lg flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b border-md-outline-variant dark:border-md-dark-outline-variant pb-3">
+        <div>
+          <h3 class="text-lg font-medium text-md-on-surface dark:text-md-dark-on-surface flex items-center gap-2">
+            <span class="material-symbols-outlined" style="font-size: 22px;">manage_accounts</span>
+            Edit User: <span id="editUserModalUsername" class="text-md-primary dark:text-md-dark-primary font-bold"></span>
+          </h3>
+          <p class="text-xs text-md-on-surface-variant dark:text-md-dark-on-surface-variant">Update role, assign game films, or reset password</p>
+        </div>
+        <button onclick="closeEditUserModal()" class="md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant w-10 h-10 p-0 rounded-full">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <input type="hidden" id="editUserIdHidden" />
+
+      <div>
+        <label class="text-xs font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant block mb-1">Role</label>
+        <select id="editUserRoleSelect" onchange="toggleEditUserRoleFields()" class="w-full bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-3 py-2 text-sm text-md-on-surface dark:text-md-dark-on-surface">
+          <option value="coach">Coach (Can edit videos, mark events, slice clips)</option>
+          <option value="player">Player (Dedicated profile view of personal plays)</option>
+          <option value="viewer">Viewer (Read-only scouting: watch & export)</option>
+          <option value="admin">Admin (Full project & user management)</option>
+        </select>
+      </div>
+
+      <div id="editUserPlayerBox" class="hidden">
+        <label class="text-xs font-medium text-md-tertiary dark:text-md-dark-tertiary block mb-1">Assign to Player</label>
+        <select id="editUserPlayerSelect" class="w-full bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-3 py-2 text-sm text-md-on-surface dark:text-md-dark-on-surface font-medium"></select>
+      </div>
+
+      <div id="editUserProjectAccessBox">
+        <div class="flex items-center justify-between mb-1">
+          <label class="text-xs font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant">Game Film Access</label>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="toggleAllEditProjects(true)" class="text-[11px] text-md-primary dark:text-md-dark-primary hover:underline">Select All</button>
+            <span class="text-xs text-md-outline">|</span>
+            <button type="button" onclick="toggleAllEditProjects(false)" class="text-[11px] text-md-on-surface-variant dark:text-md-dark-on-surface-variant hover:underline">Clear</button>
+          </div>
+        </div>
+        <div id="editUserProjectCheckboxes" class="flex flex-col gap-1.5 max-h-36 overflow-y-auto p-2 bg-md-surface-container-high dark:bg-md-dark-surface-container-high rounded-md-sm border border-md-outline-variant dark:border-md-dark-outline-variant text-xs"></div>
+        <p class="text-[11px] text-md-on-surface-variant dark:text-md-dark-on-surface-variant mt-1">Check all game films this coach or viewer is permitted to access.</p>
+      </div>
+
+      <div class="p-3 bg-md-surface-container dark:bg-md-dark-surface-container rounded-md-md border border-md-outline-variant dark:border-md-dark-outline-variant flex flex-col gap-2">
+        <label class="text-xs font-medium text-md-on-surface dark:text-md-dark-on-surface flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-md-tertiary dark:text-md-dark-tertiary" style="font-size: 16px;">lock_reset</span>
+          Reset Password
+        </label>
+        <input type="password" id="editUserNewPassword" placeholder="Enter new password (leave blank to keep current)" class="w-full bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-3 py-2 text-sm text-md-on-surface dark:text-md-dark-on-surface">
+        <p class="text-[11px] text-md-on-surface-variant dark:text-md-dark-on-surface-variant italic">Enter a new password (min 4 chars) to reset this user's password.</p>
+      </div>
+
+      <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-md-outline-variant dark:border-md-dark-outline-variant">
+        <button onclick="closeEditUserModal()" class="md-btn-outlined border-md-outline dark:border-md-dark-outline text-md-primary dark:text-md-dark-primary">Cancel</button>
+        <button id="saveEditUserBtn" class="md-btn-filled bg-md-primary dark:bg-md-dark-primary text-md-on-primary dark:text-md-dark-on-primary">
+          <span class="material-symbols-outlined" style="font-size: 18px;">save</span>
+          Save User Changes
+        </button>
+      </div>
+    </div>
+  </div>
+

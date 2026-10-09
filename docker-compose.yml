@@ -1,0 +1,21 @@
+#test commit local
+services:
+  film_room_dev:
+    build: .
+    container_name: sports_film_room_dev
+    ports:
+      - "8125:8123"
+    volumes:
+      - ./data:/app/data
+    # Hardware acceleration support (Intel VA-API / QuickSync)
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      - APP_ENV=DEV
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+      - WHISPER_ENABLED=true
+      - WHISPER_MODEL=base        # tiny | base | small (small needs ~2GB RAM, no VRAM)
+      - WHISPER_DEVICE=cpu        # keep as cpu to leave the 1060 for ffmpeg
+      - WHISPER_COMPUTE=int8      # int8 is fastest on CPU, negligible accuracy loss
+    restart: unless-stopped

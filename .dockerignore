@@ -1,0 +1,9 @@
+# .dockerignore
+data/
+data/**
+*.mp4
+*.mkv
+*.mov
+__pycache__/
+*.pyc
+.git/
