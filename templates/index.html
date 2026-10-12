@@ -836,6 +836,9 @@
         </div>
 
         <div id="playerAssignmentBox" class="hidden">
+          <label class="text-xs font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant block mb-1">Select Roster</label>
+          <select id="assignPlayerRosterSelect" onchange="populateAssignPlayerOptions()" class="w-full bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-3 py-2 text-sm text-md-on-surface dark:text-md-dark-on-surface font-medium mb-2"></select>
+
           <label class="text-xs font-medium text-md-tertiary dark:text-md-dark-tertiary block mb-1">Assign to Player</label>
           <select id="assignPlayerSelect" class="w-full bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-3 py-2 text-sm text-md-on-surface dark:text-md-dark-on-surface font-medium"></select>
         </div>
@@ -1998,7 +2001,10 @@
     function getCurrentRosterPlayers() {
       const proj = getCurrentProject();
       let list = [];
-      if (proj && proj.roster_name) {
+      if (window.selectedRosterForTagging) {
+        const matched = rosters.find(r => r.name.toLowerCase() === window.selectedRosterForTagging.toLowerCase());
+        if (matched) list = matched.players || [];
+      } else if (proj && proj.roster_name) {
         const matched = rosters.find(r => r.name.toLowerCase() === proj.roster_name.toLowerCase());
         if (matched) list = matched.players || [];
       } else if (rosters[0]) {
@@ -2102,6 +2108,11 @@
       togglePlayerRoleFields();
 
       if (u.role === 'player') {
+        const matchingRoster = rosters.find(r => (r.players || []).some(p => p.toLowerCase() === (u.player_name || '').toLowerCase()));
+        if (matchingRoster) {
+          document.getElementById('assignPlayerRosterSelect').value = matchingRoster.name;
+          populateAssignPlayerOptions();
+        }
         document.getElementById('assignPlayerSelect').value = u.player_name || '';
       } else {
         document.querySelectorAll('.project-assign-cb').forEach(cb => {
@@ -2115,6 +2126,16 @@
       if(title) title.innerHTML = `<span class="material-symbols-outlined" style="font-size: 18px;">manage_accounts</span> Edit Account`;
     };
 
+    window.populateAssignPlayerOptions = () => {
+      const rosterSelect = document.getElementById('assignPlayerRosterSelect');
+      const playerSelect = document.getElementById('assignPlayerSelect');
+      if (!rosterSelect || !playerSelect) return;
+      const selectedRosterName = rosterSelect.value;
+      const matched = rosters.find(r => r.name.toLowerCase() === (selectedRosterName || '').toLowerCase());
+      const playerList = (matched ? matched.players || [] : []).filter(p => p && !p.toLowerCase().includes('unassigned'));
+      playerSelect.innerHTML = playerList.map(p => `<option value="${p}">${p}</option>`).join('');
+    };
+
     function togglePlayerRoleFields() {
       const role = document.getElementById('newUserRole').value;
       const playerBox = document.getElementById('playerAssignmentBox');
@@ -2123,15 +2144,11 @@
       if (role === 'player') {
         playerBox.classList.remove('hidden');
         projectBox.classList.add('hidden');
-        
-        const select = document.getElementById('assignPlayerSelect');
-        const allPlayers = new Set();
-        rosters.forEach(r => {
-          (r.players || []).forEach(p => {
-            if (p && !p.toLowerCase().includes('unassigned')) allPlayers.add(p);
-          });
-        });
-        select.innerHTML = Array.from(allPlayers).map(p => `<option value="${p}">${p}</option>`).join('');
+        const rosterSelect = document.getElementById('assignPlayerRosterSelect');
+        if (rosterSelect) {
+          rosterSelect.innerHTML = rosters.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
+        }
+        populateAssignPlayerOptions();
       } else {
         playerBox.classList.add('hidden');
         projectBox.classList.remove('hidden');
