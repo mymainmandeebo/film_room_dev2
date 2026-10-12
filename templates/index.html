@@ -743,6 +743,57 @@
     </div>
   </div>
 
+  <!-- ================= DELETE PROJECT CONFIRMATION MODAL ================= -->
+  <div id="deleteProjectModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 hidden backdrop-blur-sm">
+    <div class="md-dialog bg-md-surface-container-lowest dark:bg-md-dark-surface-container-low border-2 border-md-error dark:border-md-dark-error shadow-md-4 w-full max-w-lg flex flex-col gap-4">
+      <div class="flex items-start gap-3 border-b border-md-outline-variant dark:border-md-dark-outline-variant pb-3">
+        <div class="w-11 h-11 rounded-full bg-md-error-container dark:bg-md-dark-error-container flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined filled text-md-on-error-container dark:text-md-dark-on-error-container" style="font-size: 24px;">warning</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-lg font-medium text-md-error dark:text-md-dark-error flex items-center gap-2">
+            Delete Game Film
+          </h3>
+          <p class="text-xs text-md-on-surface-variant dark:text-md-dark-on-surface-variant mt-0.5">This action is permanent and cannot be undone.</p>
+        </div>
+        <button onclick="closeDeleteProjectModal()" class="md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant w-10 h-10 p-0 rounded-full shrink-0">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <div>
+        <p class="text-sm text-md-on-surface dark:text-md-dark-on-surface">
+          You are about to permanently delete <strong id="deleteProjectNameDisplay" class="text-md-error dark:text-md-dark-error"></strong>.
+        </p>
+        <ul id="deleteProjectImpactList" class="mt-3 flex flex-col gap-1.5 text-sm text-md-on-surface-variant dark:text-md-dark-on-surface-variant bg-md-error-container/20 dark:bg-md-dark-error-container/20 border border-md-error/30 dark:border-md-dark-error/30 rounded-md-sm p-3">
+          <!-- Populated dynamically -->
+        </ul>
+      </div>
+
+      <div>
+        <label class="text-xs font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant block mb-1.5">
+          Type the game name to confirm:
+        </label>
+        <input type="text" id="deleteProjectConfirmInput" autocorrect="off" autocapitalize="none" autocomplete="off"
+               placeholder="Type exact game name..."
+               class="w-full bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-4 py-3 text-sm text-md-on-surface dark:text-md-dark-on-surface font-mono focus:outline-none focus:border-md-error dark:focus:border-md-dark-error">
+        <p id="deleteProjectConfirmHint" class="text-xs text-md-error dark:text-md-dark-error mt-1.5 hidden font-medium">
+          <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: -2px;">error</span>
+          Name does not match. Type the exact game name shown above.
+        </p>
+      </div>
+
+      <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-md-outline-variant dark:border-md-dark-outline-variant">
+        <button onclick="closeDeleteProjectModal()" class="md-btn-outlined border-md-outline dark:border-md-dark-outline text-md-primary dark:text-md-dark-primary">Cancel</button>
+        <button id="confirmDeleteProjectBtn" disabled
+                class="md-btn-filled bg-md-error dark:bg-md-dark-error text-md-on-error dark:text-md-dark-on-error disabled:opacity-40 disabled:cursor-not-allowed">
+          <span class="material-symbols-outlined" style="font-size: 18px;">delete_forever</span>
+          Permanently Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ================= ADD CLIP TO REEL MODAL ================= -->
   <div id="addToReelModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 hidden backdrop-blur-sm">
     <div class="md-dialog bg-md-surface-container-lowest dark:bg-md-dark-surface-container-low border border-md-outline-variant dark:border-md-dark-outline-variant shadow-md-3 w-full max-w-md flex flex-col gap-4">
