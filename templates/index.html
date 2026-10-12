@@ -597,87 +597,6 @@
       user-select: none;
       touch-action: none;
     }
-
-    /* --- Saved Clip "Excitement" Styling ---
-       Make saved clips visually pop with an animated gradient border,
-       a subtle glow, and a shimmer sweep so they stand out at a glance. */
-    @keyframes clipGlowPulse {
-      0%, 100% {
-        box-shadow: 0 0 0 0 rgba(103, 80, 164, 0.0),
-                    0 2px 6px 0 rgba(0,0,0,0.18);
-      }
-      50% {
-        box-shadow: 0 0 0 3px rgba(103, 80, 164, 0.18),
-                    0 4px 14px 2px rgba(103, 80, 164, 0.35);
-      }
-    }
-    @keyframes clipShimmerSweep {
-      0% { transform: translateX(-120%); }
-      100% { transform: translateX(220%); }
-    }
-    @keyframes clipBadgePop {
-      0% { transform: scale(1); }
-      40% { transform: scale(1.14); }
-      100% { transform: scale(1); }
-    }
-    .saved-clip-card {
-      position: relative;
-      overflow: hidden;
-      border: 1px solid transparent !important;
-      background:
-        linear-gradient(var(--clip-card-bg, #F7F2FA), var(--clip-card-bg, #F7F2FA)) padding-box,
-        linear-gradient(120deg, #6750A4, #7D5260, #6750A4) border-box !important;
-      background-size: 100% 100%, 220% 220% !important;
-      animation: clipGlowPulse 3.2s ease-in-out infinite,
-                 clipGradientShift 6s linear infinite;
-      transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    @keyframes clipGradientShift {
-      0% { background-position: 0 0, 0% 50%; }
-      50% { background-position: 0 0, 100% 50%; }
-      100% { background-position: 0 0, 0% 50%; }
-    }
-    .dark .saved-clip-card {
-      --clip-card-bg: #2B2930;
-      background:
-        linear-gradient(var(--clip-card-bg), var(--clip-card-bg)) padding-box,
-        linear-gradient(120deg, #D0BCFF, #EFB8C8, #D0BCFF) border-box !important;
-      background-size: 100% 100%, 220% 220% !important;
-      animation: clipGlowPulse 3.2s ease-in-out infinite,
-                 clipGradientShift 6s linear infinite;
-    }
-    .saved-clip-card:hover {
-      transform: translateY(-2px) scale(1.012);
-    }
-    .saved-clip-card::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 45%;
-      height: 100%;
-      background: linear-gradient(
-        100deg,
-        transparent 0%,
-        rgba(255,255,255,0.28) 45%,
-        rgba(255,255,255,0.5) 50%,
-        rgba(255,255,255,0.28) 55%,
-        transparent 100%
-      );
-      transform: translateX(-120%);
-      animation: clipShimmerSweep 4.5s ease-in-out infinite;
-      animation-delay: 1.2s;
-      pointer-events: none;
-      z-index: 1;
-    }
-    .saved-clip-card > * {
-      position: relative;
-      z-index: 2;
-    }
-    .saved-clip-card .saved-clip-badge {
-      animation: clipBadgePop 2.6s ease-in-out infinite;
-      animation-delay: 0.4s;
-    }
   </style>
 </head>
 <body class="bg-md-background dark:bg-md-dark-surface text-md-on-background dark:text-md-dark-on-surface min-h-screen flex flex-col font-sans transition-colors duration-200 text-base">
@@ -1533,17 +1452,21 @@
 
             <aside class="w-full lg:col-span-4 bg-md-surface-container-lowest dark:bg-md-dark-surface-container-lowest border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-lg p-4 flex flex-col min-h-[340px] max-h-[55vh] lg:max-h-[calc(100vh-120px)] shadow-sm">
         <div class="flex items-center gap-1.5 pb-3 border-b border-md-outline-variant dark:border-md-dark-outline-variant">
-          <button id="tabSavedClipsBtn" class="flex-1 md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant hover:text-md-on-surface dark:hover:text-md-dark-on-surface !py-2.5 !text-sm !rounded-full">
-            <span class="material-symbols-outlined" style="font-size: 18px;">video_library</span>
-            Saved (<span id="clipCount">0</span>)
-          </button>
           <button id="tabPendingMarksBtn" class="flex-1 md-btn-filled bg-md-tertiary/20 dark:bg-md-dark-tertiary/20 text-md-tertiary dark:text-md-dark-tertiary !py-2.5 !text-sm !rounded-full border border-md-tertiary/30 dark:border-md-dark-tertiary/30 role-editor">
             <span class="material-symbols-outlined" style="font-size: 18px;">pending</span>
             Pending (<span id="pendingCount">0</span>)
           </button>
+          <button id="tabSavedClipsBtn" class="flex-1 md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant hover:text-md-on-surface dark:hover:text-md-dark-on-surface !py-2.5 !text-sm !rounded-full">
+            <span class="material-symbols-outlined" style="font-size: 18px;">video_library</span>
+            Saved (<span id="clipCount">0</span>)
+          </button>
         </div>
 
-        <div id="savedClipsPanel" class="flex-1 overflow-y-auto mt-3 flex flex-col gap-2.5 pr-1">
+        <div id="pendingMarksPanel" class="flex-1 overflow-y-auto mt-3 flex flex-col gap-2.5 pr-1 role-editor">
+          <div id="pendingMarksList" class="flex flex-col gap-2.5"></div>
+        </div>
+
+        <div id="savedClipsPanel" class="flex-1 overflow-y-auto mt-3 flex flex-col gap-2.5 pr-1 hidden">
           <div class="flex flex-col gap-2 pb-3 border-b border-md-outline-variant dark:border-md-dark-outline-variant">
             <div class="flex gap-2">
               <select id="clipFilter" class="flex-1 bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-3 py-2 text-sm text-md-on-surface dark:text-md-dark-on-surface font-medium"></select>
@@ -1564,10 +1487,6 @@
           </div>
 
           <div id="clipList" class="flex-1 overflow-y-auto flex flex-col gap-2.5 mt-1"></div>
-        </div>
-
-        <div id="pendingMarksPanel" class="flex-1 overflow-y-auto mt-3 flex flex-col gap-2.5 pr-1 role-editor hidden">
-          <div id="pendingMarksList" class="flex flex-col gap-2.5"></div>
         </div>
       </aside>
 
@@ -2119,9 +2038,6 @@
       tabSavedClipsBtn.className = "flex-1 md-btn-filled bg-md-primary/20 dark:bg-md-dark-primary/20 text-md-primary dark:text-md-dark-primary !py-2.5 !text-sm !rounded-full border border-md-primary/30 dark:border-md-dark-primary/30";
       tabPendingMarksBtn.className = "flex-1 md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant hover:text-md-on-surface dark:hover:text-md-dark-on-surface !py-2.5 !text-sm !rounded-full role-editor";
     };
-
-    // Default active tab on load: Saved Clips
-    tabSavedClipsBtn.onclick();
 
     // --- User Management (RBAC) ---
     const btnOpenUserModal = document.getElementById('btnOpenUserModal');
@@ -4853,13 +4769,12 @@
         const clipStartTime = (c.start_time !== undefined && c.start_time !== null) ? c.start_time : c.startTime;
 
         return `
-          <div class="saved-clip-card p-3 rounded-md-md flex flex-col gap-1.5 shadow-sm">
+          <div class="bg-md-surface-container-high dark:bg-md-dark-surface-container-high p-3 rounded-md-md border border-md-outline-variant dark:border-md-dark-outline-variant flex flex-col gap-1.5 shadow-sm">
             <div class="flex justify-between items-start gap-2">
               <div class="flex flex-wrap gap-1">
                 ${clipTags.map(t => `<span class="md-chip selected bg-md-primary dark:bg-md-dark-primary text-md-on-primary dark:text-md-dark-on-primary border-transparent !py-0.5 !px-2 !text-xs">${t}</span>`).join('')}
               </div>
-              <span class="saved-clip-badge text-xs font-mono font-bold text-md-tertiary dark:text-md-dark-tertiary shrink-0 inline-flex items-center gap-1 bg-md-tertiary-container/40 dark:bg-md-dark-tertiary-container/40 px-2 py-0.5 rounded-full border border-md-tertiary/30 dark:border-md-dark-tertiary/30">
-                <span class="material-symbols-outlined" style="font-size: 13px;">check_circle</span>
+              <span class="text-xs font-mono font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant shrink-0">
                 ${clipStartTime !== undefined && clipStartTime !== null ? `<span class="text-md-primary dark:text-md-dark-primary font-bold">${formatTime(clipStartTime)}</span> • ` : ''}${c.duration}s
               </span>
             </div>
