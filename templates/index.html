@@ -1568,6 +1568,7 @@
     let editingReelId = null;
     let editingRosterIndex = null;
     let editingRosterLogo = null;
+    let pendingLogoFile = null;
     let currentClipToReel = null;
     let selectedProfilePlayer = null;
     let playerPhotos = {};
@@ -3057,12 +3058,14 @@
         nameInput.value = r.name;
         playersInput.value = (r.players || []).filter(p => !p.toLowerCase().includes('unassigned')).join('\n');
         editingRosterLogo = r.logo_url || null;
+        pendingLogoFile = null;
         updateModalRosterLogoPreview(editingRosterLogo);
       } else {
         title.innerHTML = '<span class="material-symbols-outlined" style="font-size: 20px;">groups</span> Create New Team Roster';
         nameInput.value = '';
         playersInput.value = '';
         editingRosterLogo = null;
+        pendingLogoFile = null;
         updateModalRosterLogoPreview(null);
       }
       modal.classList.remove('hidden');
@@ -3071,6 +3074,7 @@
     function closeRosterEditorModal() {
       editingRosterIndex = null;
       editingRosterLogo = null;
+      pendingLogoFile = null;
       document.getElementById('rosterEditorModal').classList.add('hidden');
     }
     function updateModalRosterLogoPreview(dataUrl) {
@@ -3092,16 +3096,19 @@
 
     window.removeModalRosterLogo = () => {
       editingRosterLogo = '';
+      pendingLogoFile = null;
+      const logoInput = document.getElementById('modalRosterLogoInput');
+      if (logoInput) logoInput.value = '';
       updateModalRosterLogoPreview(null);
     };
 
     document.getElementById('modalRosterLogoInput')?.addEventListener('change', (e) => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
+      pendingLogoFile = file;
       const reader = new FileReader();
       reader.onload = (evt) => {
-        editingRosterLogo = evt.target.result;
-        updateModalRosterLogoPreview(editingRosterLogo);
+        updateModalRosterLogoPreview(evt.target.result);
       };
       reader.readAsDataURL(file);
     });
@@ -3113,6 +3120,26 @@
       const name = document.getElementById('modalRosterNameInput').value.trim();
       const rawPlayers = document.getElementById('modalRosterPlayersInput').value;
       if (!name) return alert("Roster name is required.");
+
+      let logoUrl = editingRosterLogo;
+      if (pendingLogoFile) {
+        const formData = new FormData();
+        formData.append('roster_name', name);
+        formData.append('logo', pendingLogoFile);
+        try {
+          const logoRes = await fetch('/api/rosters/logo', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+          });
+          if (logoRes.ok) {
+            const logoData = await logoRes.json();
+            logoUrl = logoData.url || logoData.logo_url;
+          }
+        } catch (err) {
+          console.error('Failed to upload roster logo:', err);
+        }
+      }
 
       const playerList = rawPlayers.split(/[,\n]+/).map(p => p.trim()).filter(p => p.length > 0 && !p.toLowerCase().includes('unassigned'));
       const oldName = editingRosterIndex !== null ? rosters[editingRosterIndex].name : null;
@@ -3127,7 +3154,7 @@
           name: name,
           players: playerList,
           old_name: oldName,
-          logo_url: editingRosterLogo
+          logo_url: logoUrl
         })
       });
 
