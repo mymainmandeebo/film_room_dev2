@@ -898,7 +898,7 @@
           <input type="text" id="projLeagueInput" placeholder="e.g. District Playoffs" class="w-full bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-4 py-3 text-sm text-md-on-surface dark:text-md-dark-on-surface">
         </div>
         <div>
-          <label class="text-xs font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant block mb-1">Assigned Team Roster</label>
+          <label class="text-xs font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant block mb-1">Step 1 — Assigned Team Roster</label>
           <select id="projRosterSelect" class="w-full bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-4 py-3 text-sm text-md-on-surface dark:text-md-dark-on-surface"></select>
         </div>
       </div>
@@ -914,10 +914,10 @@
 
       <div>
         <div class="flex justify-between items-center mb-1">
-          <label class="text-xs font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant">Players Available For This Game</label>
+          <label class="text-xs font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant">Step 2 — Players Available For This Game</label>
           <button type="button" id="projPlayersSelectAllBtn" class="text-xs font-medium text-md-primary dark:text-md-dark-primary hover:underline">Select All / Clear</button>
         </div>
-        <p class="text-[11px] text-md-on-surface-variant dark:text-md-dark-on-surface-variant mb-1.5">Leave all unchecked to use the full roster for player tagging. Down-select to only the players who dressed for this game.</p>
+        <p class="text-[11px] text-md-on-surface-variant dark:text-md-dark-on-surface-variant mb-1.5">Only the players you pick here will appear when tagging clips for this game. Leave all unchecked to allow the full roster.</p>
         <div id="projAvailablePlayersBox" class="flex flex-wrap gap-1 p-2 bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm max-h-32 overflow-y-auto text-xs">
           <!-- Populated dynamically with player toggle chips -->
         </div>
@@ -1998,21 +1998,30 @@
       return projects.find(p => p.id === currentProjectId);
     }
 
-    function getCurrentRosterPlayers() {
-      const proj = getCurrentProject();
+    // Players on the roster assigned to a game (no filtering by availability).
+    function getProjectRosterPlayers(proj) {
+      if (!proj) return [];
       let list = [];
-      if (window.selectedRosterForTagging) {
-        const matched = rosters.find(r => r.name.toLowerCase() === window.selectedRosterForTagging.toLowerCase());
-        if (matched) list = matched.players || [];
-      } else if (proj && proj.roster_name) {
+      if (proj.roster_name) {
         const matched = rosters.find(r => r.name.toLowerCase() === proj.roster_name.toLowerCase());
         if (matched) list = matched.players || [];
       } else if (rosters[0]) {
         list = rosters[0].players || [];
       }
+      return list.filter(p => p && typeof p === 'string' && p.trim() && !p.toLowerCase().includes('unassigned'));
+    }
 
-      const clean = list.filter(p => p && typeof p === 'string' && !p.toLowerCase().includes('unassigned'));
-      return [...clean, "Unassigned / Team Play"];
+    // Players selectable when tagging clips for the CURRENT game:
+    // the game's assigned roster, down-selected to players available that game
+    // (if an availability list was saved), plus "Unassigned / Team Play".
+    function getCurrentRosterPlayers() {
+      const proj = getCurrentProject();
+      let list = getProjectRosterPlayers(proj);
+      if (proj && Array.isArray(proj.available_players) && proj.available_players.length > 0) {
+        const avail = new Set(proj.available_players);
+        list = list.filter(p => avail.has(p));
+      }
+      return [...list, "Unassigned / Team Play"];
     }
 
     // --- Tab / Screen Navigation ---
@@ -2286,6 +2295,10 @@
       if (!box) return;
 
       const allPlayers = getRosterPlayersByName(rosterName);
+      if (!rosterName) {
+        box.innerHTML = `<span class="text-md-on-surface-variant dark:text-md-dark-on-surface-variant italic py-1">Select a roster above to choose which players were available for this game.</span>`;
+        return;
+      }
       if (allPlayers.length === 0) {
         box.innerHTML = `<span class="text-md-on-surface-variant dark:text-md-dark-on-surface-variant italic py-1">No players in this roster yet. Add players from the Roster editor first.</span>`;
         return;
@@ -2296,14 +2309,14 @@
 
       box.innerHTML = allPlayers.map(p => {
         const isChecked = selectedSet.has(p);
-        const attrEsc = p.replace(/"/g, '&quot;');
+        const attrEsc = escAttr(p);
         return `
           <button type="button"
                   class="proj-player-chip md-chip ${isChecked ? 'selected bg-md-primary dark:bg-md-dark-primary text-md-on-primary dark:text-md-dark-on-primary border-transparent' : 'bg-md-surface-container-lowest dark:bg-md-dark-surface-container-lowest text-md-on-surface-variant dark:text-md-dark-on-surface-variant border-md-outline dark:border-md-dark-outline'}"
                   data-player="${attrEsc}"
                   onclick="toggleProjAvailablePlayer(this)">
             <span class="material-symbols-outlined" style="font-size: 14px;">${isChecked ? 'check' : 'add'}</span>
-            <span>${p}</span>
+            <span>${escAttr(p)}</span>
           </button>
         `;
       }).join('');
@@ -2331,6 +2344,12 @@
         .map(el => el.getAttribute('data-player'));
     }
 
+    function escAttr(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+    function rosterOptionsHtml(withPlaceholder) {
+      return (withPlaceholder ? '<option value="">— Select a roster —</option>' : '') +
+        rosters.map(r => `<option value="${escAttr(r.name)}">${escAttr(r.name)}</option>`).join('');
+    }
+
     function openProjectModal(projId = null) {
       editingProjectId = projId;
       const modal = document.getElementById('projectModal');
@@ -2343,7 +2362,7 @@
       const sportSelect = document.getElementById('projSportSelect');
       const descInput = document.getElementById('projDescInput');
 
-      rosterSelect.innerHTML = rosters.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
+      rosterSelect.innerHTML = rosterOptionsHtml(!projId);
 
       if (projId) {
         const p = projects.find(x => x.id === projId);
@@ -2365,9 +2384,9 @@
         leagueInput.value = '';
         sportSelect.value = 'Basketball';
         descInput.value = '';
-        if (rosters[0]) rosterSelect.value = rosters[0].name;
+        rosterSelect.value = '';
         projModalAvailablePlayers = null;
-        renderProjAvailablePlayers(rosterSelect.value, null);
+        renderProjAvailablePlayers('', null);
       }
       modal.classList.remove('hidden');
     }
@@ -2418,6 +2437,7 @@
       const selectedAvailable = getProjModalSelectedPlayers();
 
       const payload = { name, opponent, game_date, league, roster_name, sport, description, available_players: selectedAvailable };
+      const editedId = editingProjectId;
       const url = editingProjectId ? `/api/projects/${editingProjectId}` : '/api/projects';
       const method = editingProjectId ? 'PUT' : 'POST';
 
@@ -2428,8 +2448,20 @@
       });
 
       if (res.ok) {
+        // Local backup of the game's roster + availability (used if the server omits them)
+        try {
+          const saved = await res.clone().json();
+          const pid = editedId || (saved && saved.id);
+          if (pid) localStorage.setItem(`gameSetup_${pid}`, JSON.stringify({ roster_name, available_players: selectedAvailable }));
+        } catch (e) {}
         closeProjectModal();
         await loadProjects();
+        // If the workspace for this game is open, refresh its player lists
+        if (currentProjectId) {
+          updatePlayerFilterDropdown();
+          renderPendingMarks();
+          if (typeof loadClips === 'function') loadClips();
+        }
       } else {
         const err = await res.json();
         alert(err.detail || "Failed to save project.");
@@ -3107,7 +3139,9 @@
     function renderRostersUI() {
       const projRosterSelect = document.getElementById('projRosterSelect');
       if (projRosterSelect) {
-        projRosterSelect.innerHTML = rosters.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
+        const prev = projRosterSelect.value;
+        projRosterSelect.innerHTML = rosterOptionsHtml(false);
+        if (prev) projRosterSelect.value = prev;
       }
 
       const container = document.getElementById('homeRostersList');
@@ -3944,6 +3978,15 @@
           return;
         }
         projects = await res.json();
+        projects.forEach(p => {
+          try {
+            const saved = JSON.parse(localStorage.getItem(`gameSetup_${p.id}`) || 'null');
+            if (saved) {
+              if (!p.roster_name && saved.roster_name) p.roster_name = saved.roster_name;
+              if (!Array.isArray(p.available_players) && Array.isArray(saved.available_players)) p.available_players = saved.available_players;
+            }
+          } catch (e) {}
+        });
       } catch (err) {
         console.error("loadProjects network error:", err);
         return;
@@ -5090,6 +5133,7 @@
 
       const plContainer = document.getElementById('editClipPlayerBadges');
       const rosterPlayers = getCurrentRosterPlayers();
+      editModalSelectedPlayers.forEach(p => { if (!rosterPlayers.includes(p)) rosterPlayers.splice(rosterPlayers.length - 1, 0, p); });
       plContainer.innerHTML = rosterPlayers.map(p => {
         const isChecked = editModalSelectedPlayers.includes(p);
         return `
@@ -5215,17 +5259,20 @@
       } else {
         if (playerSelectionCard) playerSelectionCard.classList.remove('hidden');
 
-        // Populate the roster dropdown from the loaded rosters.
+        // Preserve an already-chosen roster across view switches; otherwise
+        // default to the first roster (not "All") so the player dropdown
+        // always has a concrete roster to draw from.
         const rosterSelect = document.getElementById('profileRosterSelect');
+        const previousRoster = rosterSelect.value;
         rosterSelect.innerHTML = rosters.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
 
-        // Default to the first roster if nothing is selected yet, otherwise
-        // keep whatever roster the user had picked.
-        if (!rosterSelect.value && rosters.length > 0) {
+        if (previousRoster && rosters.some(r => r.name === previousRoster)) {
+          rosterSelect.value = previousRoster;
+        } else if (rosters.length > 0) {
           rosterSelect.value = rosters[0].name;
         }
 
-        // Clear the current player so the user must pick from the selected roster.
+        // New roster → clear out any player carried over from a different roster.
         selectedProfilePlayer = null;
         onProfileRosterChanged();
       }
@@ -5374,7 +5421,7 @@
       const chipsContainer = document.getElementById('profilePlayerChipsContainer');
       const countBadge = document.getElementById('playerSelectCountBadge');
 
-      // Build the player list strictly from the chosen roster.
+      // A specific roster must be chosen; we no longer aggregate across all rosters.
       let playerList = [];
       if (rosterName) {
         const r = rosters.find(x => x.name.toLowerCase() === rosterName.toLowerCase());
@@ -5409,7 +5456,8 @@
         }
       }
 
-      // Keep the previously selected player only if they belong to the chosen roster.
+      // If the previously selected player belongs to this roster, keep them;
+      // otherwise clear the selection so the user must pick from this roster.
       if (selectedProfilePlayer && playerList.includes(selectedProfilePlayer)) {
         if (playerSelect) playerSelect.value = selectedProfilePlayer;
         updatePlayerAvatarUI(selectedProfilePlayer);
