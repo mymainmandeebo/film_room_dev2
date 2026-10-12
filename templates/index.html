@@ -1640,6 +1640,24 @@
     const savedCompact = localStorage.getItem('compactMode') === 'true';
     applyCompact(savedCompact);
 
+    // --- TELESTRATION / DRAWING MODE ---
+    // Toggles the drawing canvas overlay. Lives here so both the video overlay
+    // controls and the quick-toggle toolbar can drive the same state.
+    function setDrawingMode(enabled) {
+      isDrawingMode = !!enabled;
+      if (canvas) canvas.classList.toggle('drawing-mode', isDrawingMode);
+      QuickToggles.syncDrawState();
+      if (isDrawingMode && video && !video.paused) video.pause();
+    }
+
+    function toggleDrawingMode() {
+      setDrawingMode(!isDrawingMode);
+    }
+
+    function clearDrawing() {
+      if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
     compactToggleBtn.onclick = () => {
       const isCurrentlyCompact = document.documentElement.classList.contains('compact');
       applyCompact(!isCurrentlyCompact);
@@ -3149,9 +3167,7 @@
 
         if (drawBtn) {
           drawBtn.addEventListener('click', () => {
-            // Delegate to the existing telestration toggle so state stays in sync
-            document.getElementById('telestrationToggle').click();
-            this.syncDrawState();
+            toggleDrawingMode();
           });
         }
 
@@ -3282,8 +3298,7 @@
 
         // Turn off drawing if active
         if (isDrawingMode) {
-          document.getElementById('telestrationToggle').click();
-          this.syncDrawState();
+          setDrawingMode(false);
         }
 
         // Exit fullscreen if active
@@ -5343,18 +5358,8 @@
       }
     });
 
-    // Touch Telestration Canvas
-    const telestrationBtn = document.getElementById('telestrationToggle');
-    telestrationBtn.onclick = () => {
-      isDrawingMode = !isDrawingMode;
-      canvas.classList.toggle('drawing-mode', isDrawingMode);
-      telestrationBtn.classList.toggle('bg-md-tertiary', isDrawingMode);
-      telestrationBtn.classList.toggle('dark:bg-md-dark-tertiary', isDrawingMode);
-      telestrationBtn.classList.toggle('bg-md-surface-container-high', !isDrawingMode);
-      telestrationBtn.classList.toggle('dark:bg-md-dark-surface-container-high', !isDrawingMode);
-      if (isDrawingMode) video.pause();
-    };
-    document.getElementById('clearDrawingBtn').onclick = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Drawing canvas brush (mode is toggled via QuickToggles / setDrawingMode)
+    // The "clear drawing" action is exposed as clearDrawing() above.
 
     function getCanvasCoords(e) {
       const rect = canvas.getBoundingClientRect();
