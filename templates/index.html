@@ -940,6 +940,21 @@
         <input type="text" id="modalRosterNameInput" placeholder="e.g. Varsity 2026" class="w-full bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-4 py-3 text-sm text-md-on-surface dark:text-md-dark-on-surface">
       </div>
       <div>
+        <label class="text-xs font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant block mb-1">Team Logo</label>
+        <div class="flex items-center gap-3 bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm p-3">
+          <div class="w-12 h-12 rounded-full bg-md-surface-container-highest dark:bg-md-dark-surface-container-highest border border-md-outline-variant dark:border-md-dark-outline-variant flex items-center justify-center overflow-hidden shrink-0">
+            <img id="modalRosterLogoPreview" src="" alt="Team Logo Preview" class="w-full h-full object-cover hidden">
+            <span id="modalRosterLogoPlaceholder" class="material-symbols-outlined text-md-on-surface-variant dark:text-md-dark-on-surface-variant" style="font-size: 24px;">shield</span>
+          </div>
+          <label class="md-btn-outlined border-md-outline dark:border-md-dark-outline text-md-on-surface dark:text-md-dark-on-surface !py-1.5 !px-3 !text-xs cursor-pointer flex items-center gap-1.5">
+            <span class="material-symbols-outlined" style="font-size: 16px;">upload</span>
+            <span>Upload Logo</span>
+            <input type="file" id="modalRosterLogoInput" accept="image/*" class="hidden">
+          </label>
+          <button type="button" id="modalRosterRemoveLogoBtn" onclick="removeModalRosterLogo()" class="md-btn-text text-md-error dark:text-md-dark-error !py-1.5 !px-2.5 !text-xs hidden">Remove</button>
+        </div>
+      </div>
+      <div>
         <label class="text-xs font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant block mb-1">Players (comma or line separated)</label>
         <textarea id="modalRosterPlayersInput" placeholder="#23 Jordan, #33 Pippen, #91 Rodman" class="w-full bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm p-4 text-sm text-md-on-surface dark:text-md-dark-on-surface resize-none" rows="6"></textarea>
       </div>
@@ -1283,7 +1298,10 @@
           <div class="flex items-center gap-2">
             <span id="activeOpponentDisplay" class="text-sm text-md-on-surface-variant dark:text-md-dark-on-surface-variant font-medium hidden"></span>
             <span id="activeLeagueDisplay" class="text-xs font-mono bg-md-secondary-container dark:bg-md-dark-secondary-container text-md-on-secondary-container dark:text-md-dark-on-secondary-container px-2.5 py-1 rounded-full hidden font-medium"></span>
-            <span id="activeRosterDisplay" class="text-xs font-mono text-md-primary dark:text-md-dark-primary bg-md-primary-container dark:bg-md-dark-primary-container px-2.5 py-1 rounded-full truncate font-medium"></span>
+            <span id="activeRosterDisplay" class="inline-flex items-center gap-1.5 text-xs font-mono text-md-primary dark:text-md-dark-primary bg-md-primary-container dark:bg-md-dark-primary-container px-2.5 py-1 rounded-full truncate font-medium">
+              <img id="activeRosterLogoImg" src="" alt="" class="w-4 h-4 rounded-full object-cover hidden">
+              <span id="activeRosterText"></span>
+            </span>
           </div>
         </div>
         <div class="bg-md-surface-container-lowest dark:bg-md-dark-surface-container-lowest border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-lg px-4 py-2.5 flex flex-col gap-2 shadow-sm">
@@ -1549,6 +1567,7 @@
     let editingProjectId = null;
     let editingReelId = null;
     let editingRosterIndex = null;
+    let editingRosterLogo = null;
     let currentClipToReel = null;
     let selectedProfilePlayer = null;
     let playerPhotos = {};
@@ -2985,8 +3004,17 @@
         return `
           <div class="bg-md-surface-container-lowest dark:bg-md-dark-surface-container-lowest border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-lg p-3.5 flex flex-col justify-between shadow-sm md-elevation">
             <div class="flex justify-between items-start">
-              <div>
-                <h3 class="font-medium text-sm text-md-on-surface dark:text-md-dark-on-surface">${r.name}</h3>
+              <div class="flex items-center gap-2.5">
+                ${r.logo_url ? `
+                  <img src="${r.logo_url}" alt="${r.name} Logo" class="w-8 h-8 rounded-full object-cover border border-md-outline-variant dark:border-md-dark-outline-variant shrink-0">
+                ` : `
+                  <div class="w-8 h-8 rounded-full bg-md-surface-container-high dark:bg-md-dark-surface-container-high flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined text-md-on-surface-variant dark:text-md-dark-on-surface-variant" style="font-size: 18px;">shield</span>
+                  </div>
+                `}
+                <div>
+                  <h3 class="font-medium text-sm text-md-on-surface dark:text-md-dark-on-surface">${r.name}</h3>
+                </div>
                 <span class="text-xs font-mono font-medium text-md-tertiary dark:text-md-dark-tertiary">${validPlayers.length} ${validPlayers.length === 1 ? 'Player' : 'Players'}</span>
               </div>
               <div class="flex items-center gap-1.5">
@@ -3020,24 +3048,64 @@
       const title = document.getElementById('rosterModalTitle');
       const nameInput = document.getElementById('modalRosterNameInput');
       const playersInput = document.getElementById('modalRosterPlayersInput');
+      const logoInput = document.getElementById('modalRosterLogoInput');
+      if (logoInput) logoInput.value = '';
 
       if (idx !== null) {
         const r = rosters[idx];
         title.innerHTML = '<span class="material-symbols-outlined" style="font-size: 20px;">groups</span> Edit Roster';
         nameInput.value = r.name;
         playersInput.value = (r.players || []).filter(p => !p.toLowerCase().includes('unassigned')).join('\n');
+        editingRosterLogo = r.logo_url || null;
+        updateModalRosterLogoPreview(editingRosterLogo);
       } else {
         title.innerHTML = '<span class="material-symbols-outlined" style="font-size: 20px;">groups</span> Create New Team Roster';
         nameInput.value = '';
         playersInput.value = '';
+        editingRosterLogo = null;
+        updateModalRosterLogoPreview(null);
       }
       modal.classList.remove('hidden');
     }
 
     function closeRosterEditorModal() {
       editingRosterIndex = null;
+      editingRosterLogo = null;
       document.getElementById('rosterEditorModal').classList.add('hidden');
     }
+    function updateModalRosterLogoPreview(dataUrl) {
+      const img = document.getElementById('modalRosterLogoPreview');
+      const placeholder = document.getElementById('modalRosterLogoPlaceholder');
+      const removeBtn = document.getElementById('modalRosterRemoveLogoBtn');
+      if (dataUrl) {
+        img.src = dataUrl;
+        img.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+        removeBtn.classList.remove('hidden');
+      } else {
+        img.src = '';
+        img.classList.add('hidden');
+        placeholder.classList.remove('hidden');
+        removeBtn.classList.add('hidden');
+      }
+    }
+
+    window.removeModalRosterLogo = () => {
+      editingRosterLogo = '';
+      updateModalRosterLogoPreview(null);
+    };
+
+    document.getElementById('modalRosterLogoInput')?.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        editingRosterLogo = evt.target.result;
+        updateModalRosterLogoPreview(editingRosterLogo);
+      };
+      reader.readAsDataURL(file);
+    });
+
 
     document.getElementById('btnCreateRosterModal').onclick = () => openRosterModal(null);
 
@@ -3058,7 +3126,8 @@
         body: JSON.stringify({
           name: name,
           players: playerList,
-          old_name: oldName
+          old_name: oldName,
+          logo_url: editingRosterLogo
         })
       });
 
@@ -3840,7 +3909,16 @@
       if (proj.league) { leagueEl.innerText = proj.league; leagueEl.classList.remove('hidden'); }
       else leagueEl.classList.add('hidden');
 
-      document.getElementById('activeRosterDisplay').innerText = `Roster: ${proj.roster_name || 'Standard'}`;
+      const activeRoster = rosters.find(r => r.name.toLowerCase() === (proj.roster_name || '').toLowerCase());
+      const activeRosterLogo = document.getElementById('activeRosterLogoImg');
+      if (activeRoster && activeRoster.logo_url) {
+        activeRosterLogo.src = activeRoster.logo_url;
+        activeRosterLogo.classList.remove('hidden');
+      } else {
+        activeRosterLogo.src = '';
+        activeRosterLogo.classList.add('hidden');
+      }
+      document.getElementById('activeRosterText').innerText = `Roster: ${proj.roster_name || 'Standard'}`;
 
       if (proj.sport && proj.sport !== currentSport) {
         loadSportSettings(proj.sport);
