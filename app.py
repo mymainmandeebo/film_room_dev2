@@ -31,12 +31,11 @@ DATA_DIR = BASE_DIR / "data"
 UPLOAD_DIR = DATA_DIR / "uploads"
 CLIPS_DIR = DATA_DIR / "clips"
 REELS_DIR = DATA_DIR / "reels"
-THUMBS_DIR = DATA_DIR / "thumbnails"
 PLAYERS_DIR = DATA_DIR / "players"
 LOGOS_DIR = DATA_DIR / "logos"
 DB_FILE = DATA_DIR / "store.json"
 
-for folder in [UPLOAD_DIR, CLIPS_DIR, REELS_DIR, THUMBS_DIR, PLAYERS_DIR, LOGOS_DIR]:
+for folder in [UPLOAD_DIR, CLIPS_DIR, REELS_DIR, PLAYERS_DIR, LOGOS_DIR]:
     folder.mkdir(parents=True, exist_ok=True)
 
 security = HTTPBearer()
@@ -44,7 +43,6 @@ security = HTTPBearer()
 app.mount("/media/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 app.mount("/media/clips", StaticFiles(directory=str(CLIPS_DIR)), name="clips")
 app.mount("/media/reels", StaticFiles(directory=str(REELS_DIR)), name="reels")
-app.mount("/media/thumbnails", StaticFiles(directory=str(THUMBS_DIR)), name="thumbnails")
 app.mount("/media/players", StaticFiles(directory=str(PLAYERS_DIR)), name="players")
 app.mount("/media/logos", StaticFiles(directory=str(LOGOS_DIR)), name="logos")
 
@@ -107,8 +105,7 @@ def init_db():
             ],
             "clips": [],
             "reels": [],
-            "player_photos": {},
-            "audit_logs": []
+            "player_photos": {}
         }
         with open(DB_FILE, "w") as f:
             json.dump(default_data, f, indent=2)
@@ -121,14 +118,11 @@ def read_db():
             data = json.load(f)
             data.setdefault("reels", [])
             data.setdefault("rosters", [])
-            data.setdefault("audit_logs", [])
             for r in data.get("rosters", []):
                 r.setdefault("logo_url", None)
             data.setdefault("player_photos", {})
             for p in data.get("projects", []):
                 p.setdefault("sport", "Basketball")
-                # None means "no down-selection" -> use full roster for the game.
-                p.setdefault("available_players", None)
             for c in data.get("clips", []):
                 if "categories" not in c and "category" in c:
                     c["categories"] = [c["category"]] if c["category"] else ["General"]
@@ -138,45 +132,11 @@ def read_db():
                 c.setdefault("annotation", "")
             return data
     except Exception:
-        return {"users": [], "projects": [], "clips": [], "reels": [], "rosters": [], "player_photos": {}, "audit_logs": []}
+        return {"users": [], "projects": [], "clips": [], "reels": [], "rosters": [], "player_photos": {}}
 
 def write_db(data):
     with open(DB_FILE, "w") as f:
         json.dump(data, f, indent=2)
-
-def log_audit_event(
-    actor: Optional[Union[dict, str]],
-    action: str,
-    entity_type: str,
-    entity_id: Optional[str] = None,
-    details: Optional[dict] = None,
-    ip_address: Optional[str] = None
-):
-    db = read_db()
-    actor_username = "anonymous"
-    actor_role = "unknown"
-    if isinstance(actor, dict):
-        actor_username = actor.get("username", "anonymous")
-        actor_role = actor.get("role", "unknown")
-    elif isinstance(actor, str):
-        actor_username = actor
-
-    entry = {
-        "id": f"log_{uuid.uuid4().hex[:10]}",
-        "timestamp": int(time.time()),
-        "actor_username": actor_username,
-        "actor_role": actor_role,
-        "action": action,
-        "entity_type": entity_type,
-        "entity_id": entity_id,
-        "details": details or {},
-        "ip_address": ip_address
-    }
-    db.setdefault("audit_logs", []).insert(0, entry)
-    # Cap log entries to recent 2,000 events to prevent store bloat
-    if len(db["audit_logs"]) > 2000:
-        db["audit_logs"] = db["audit_logs"][:2000]
-    write_db(db)
 
 def create_token(user: dict) -> str:
     payload = {
@@ -223,27 +183,12 @@ class LoginPayload(BaseModel):
     password: str
 
 @app.post("/api/auth/login")
-def login(payload: LoginPayload, request: Request):
-    client_ip = request.client.host if request.client else None
+def login(payload: LoginPayload):
     db = read_db()
     user = next((u for u in db["users"] if u["username"].lower() == payload.username.lower()), None)
     if not user or not bcrypt.checkpw(payload.password.encode('utf-8'), user["password_hash"].encode('utf-8')):
-        log_audit_event(
-            actor=payload.username.strip() or "anonymous",
-            action="LOGIN_FAILED",
-            entity_type="auth",
-            details={"attempted_username": payload.username},
-            ip_address=client_ip
-        )
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    log_audit_event(
-        actor=user,
-        action="LOGIN_SUCCESS",
-        entity_type="auth",
-        entity_id=user["id"],
-        ip_address=client_ip
-    )
     return {
         "access_token": create_token(user),
         "token_type": "bearer",
@@ -270,20 +215,6 @@ class UserUpdatePayload(BaseModel):
     project_ids: Optional[List[str]] = None
     player_name: Optional[str] = None
 
-@app.get("/api/admin/audit-logs")
-def get_audit_logs(
-    limit: int = 100,
-    entity_type: Optional[str] = None,
-    user: dict = Depends(get_current_user)
-):
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin role required")
-    db = read_db()
-    logs = db.get("audit_logs", [])
-    if entity_type and entity_type != "ALL":
-        logs = [entry for entry in logs if entry.get("entity_type") == entity_type]
-    return logs[:limit]
-
 @app.get("/api/admin/users")
 def list_users(user: dict = Depends(get_current_user)):
     if user["role"] != "admin":
@@ -298,7 +229,7 @@ def list_users(user: dict = Depends(get_current_user)):
     } for u in db["users"]]
 
 @app.post("/api/admin/users")
-def create_user(payload: UserCreatePayload, request: Request, user: dict = Depends(get_current_user)):
+def create_user(payload: UserCreatePayload, user: dict = Depends(get_current_user)):
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
     if payload.role not in ["admin", "coach", "viewer", "player"]:
@@ -323,23 +254,10 @@ def create_user(payload: UserCreatePayload, request: Request, user: dict = Depen
     }
     db["users"].append(new_user)
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="USER_CREATED",
-        entity_type="user",
-        entity_id=new_user["id"],
-        details={
-            "created_username": new_user["username"],
-            "role": new_user["role"],
-            "player_name": new_user.get("player_name"),
-            "project_ids": new_user.get("project_ids")
-        },
-        ip_address=request.client.host if request.client else None
-    )
     return {"status": "created", "id": new_user["id"]}
 
 @app.put("/api/admin/users/{user_id}")
-def update_user(user_id: str, payload: UserUpdatePayload, request: Request, user: dict = Depends(get_current_user)):
+def update_user(user_id: str, payload: UserUpdatePayload, user: dict = Depends(get_current_user)):
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
 
@@ -366,22 +284,10 @@ def update_user(user_id: str, payload: UserUpdatePayload, request: Request, user
         target["project_ids"] = ["*"] if target["role"] in ["admin", "player"] else payload.project_ids
 
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="USER_UPDATED",
-        entity_type="user",
-        entity_id=user_id,
-        details={
-            "username": target["username"],
-            "role": target["role"],
-            "password_updated": bool(payload.password)
-        },
-        ip_address=request.client.host if request.client else None
-    )
     return {"status": "updated", "id": user_id}
 
 @app.delete("/api/admin/users/{user_id}")
-def delete_user(user_id: str, request: Request, user: dict = Depends(get_current_user)):
+def delete_user(user_id: str, user: dict = Depends(get_current_user)):
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
     if user["sub"] == user_id:
@@ -394,14 +300,6 @@ def delete_user(user_id: str, request: Request, user: dict = Depends(get_current
     
     db["users"] = [u for u in db["users"] if u["id"] != user_id]
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="USER_DELETED",
-        entity_type="user",
-        entity_id=user_id,
-        details={"deleted_username": target["username"], "role": target["role"]},
-        ip_address=request.client.host if request.client else None
-    )
     return {"status": "deleted"}
 
 # --- Project Management Endpoints ---
@@ -413,7 +311,6 @@ class ProjectCreatePayload(BaseModel):
     league: Optional[str] = ""
     description: Optional[str] = ""
     roster_name: Optional[str] = "Varsity 2026"
-    available_players: Optional[List[str]] = None
 
 class ProjectUpdatePayload(BaseModel):
     name: str
@@ -423,7 +320,6 @@ class ProjectUpdatePayload(BaseModel):
     league: Optional[str] = ""
     description: Optional[str] = ""
     roster_name: Optional[str] = "Varsity 2026"
-    available_players: Optional[List[str]] = None
 
 @app.get("/api/projects")
 def get_projects(user: dict = Depends(get_current_user)):
@@ -433,7 +329,7 @@ def get_projects(user: dict = Depends(get_current_user)):
     return [p for p in db["projects"] if p["id"] in user.get("project_ids", [])]
 
 @app.post("/api/projects")
-def create_project(payload: ProjectCreatePayload, request: Request, user: dict = Depends(get_current_user)):
+def create_project(payload: ProjectCreatePayload, user: dict = Depends(get_current_user)):
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Only Admins can create new game projects")
     db = read_db()
@@ -446,31 +342,14 @@ def create_project(payload: ProjectCreatePayload, request: Request, user: dict =
         "league": payload.league,
         "description": payload.description,
         "roster_name": payload.roster_name,
-        "available_players": (
-            [p.strip() for p in payload.available_players if p and p.strip()]
-            if payload.available_players is not None
-            else None
-        ),
         "video_filename": None
     }
     db["projects"].append(new_project)
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="PROJECT_CREATED",
-        entity_type="project",
-        entity_id=new_project["id"],
-        details={
-            "name": new_project["name"],
-            "sport": new_project["sport"],
-            "opponent": new_project["opponent"]
-        },
-        ip_address=request.client.host if request.client else None
-    )
     return new_project
 
 @app.put("/api/projects/{project_id}")
-def update_project(project_id: str, payload: ProjectUpdatePayload, request: Request, user: dict = Depends(get_current_user)):
+def update_project(project_id: str, payload: ProjectUpdatePayload, user: dict = Depends(get_current_user)):
     check_project_access(user, project_id)
     if user["role"] in ["viewer", "player"]:
         raise HTTPException(status_code=403, detail="Permission denied to edit projects")
@@ -488,28 +367,11 @@ def update_project(project_id: str, payload: ProjectUpdatePayload, request: Requ
     project["description"] = payload.description
     project["roster_name"] = payload.roster_name
 
-    if payload.available_players is not None:
-        cleaned = [p.strip() for p in payload.available_players if p and p.strip()]
-        # Treat an empty list as "no down-selection" so the full roster is used.
-        project["available_players"] = cleaned if cleaned else None
-
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="PROJECT_UPDATED",
-        entity_type="project",
-        entity_id=project_id,
-        details={
-            "name": project["name"],
-            "sport": project["sport"],
-            "opponent": project["opponent"]
-        },
-        ip_address=request.client.host if request.client else None
-    )
     return project
 
 @app.delete("/api/projects/{project_id}")
-def delete_project(project_id: str, request: Request, user: dict = Depends(get_current_user)):
+def delete_project(project_id: str, user: dict = Depends(get_current_user)):
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Only Admins can delete game projects")
 
@@ -543,14 +405,6 @@ def delete_project(project_id: str, request: Request, user: dict = Depends(get_c
             u["project_ids"] = [pid for pid in u["project_ids"] if pid != project_id]
 
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="PROJECT_DELETED",
-        entity_type="project",
-        entity_id=project_id,
-        details={"project_name": project["name"], "clips_deleted": len(clips_to_remove)},
-        ip_address=request.client.host if request.client else None
-    )
     return {"status": "deleted", "project_id": project_id}
 
 # --- Rosters Management ---
@@ -566,7 +420,7 @@ def list_rosters(user: dict = Depends(get_current_user)):
     return db.get("rosters", [])
 
 @app.post("/api/rosters")
-def save_roster(payload: RosterSavePayload, request: Request, user: dict = Depends(get_current_user)):
+def save_roster(payload: RosterSavePayload, user: dict = Depends(get_current_user)):
     if user["role"] in ["viewer", "player"]:
         raise HTTPException(status_code=403, detail="Permission denied to edit rosters")
 
@@ -598,22 +452,10 @@ def save_roster(payload: RosterSavePayload, request: Request, user: dict = Depen
         })
 
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="ROSTER_SAVED",
-        entity_type="roster",
-        entity_id=payload.name.strip(),
-        details={
-            "player_count": len(clean_players),
-            "is_update": bool(existing)
-        },
-        ip_address=request.client.host if request.client else None
-    )
     return {"status": "saved", "rosters": rosters}
 
 @app.post("/api/rosters/logo")
 async def upload_roster_logo(
-    request: Request,
     roster_name: str = Form(...),
     logo: UploadFile = File(...),
     user: dict = Depends(get_current_user)
@@ -641,14 +483,6 @@ async def upload_roster_logo(
         f.write(content)
 
     logo_url = f"/media/logos/{filename}"
-    log_audit_event(
-        actor=user,
-        action="ROSTER_LOGO_UPLOADED",
-        entity_type="roster",
-        entity_id=clean_roster,
-        details={"filename": filename},
-        ip_address=request.client.host if request.client else None
-    )
     return {
         "status": "uploaded",
         "url": logo_url,
@@ -656,7 +490,7 @@ async def upload_roster_logo(
     }
 
 @app.delete("/api/rosters/{roster_name}")
-def delete_roster(roster_name: str, request: Request, user: dict = Depends(get_current_user)):
+def delete_roster(roster_name: str, user: dict = Depends(get_current_user)):
     if user["role"] in ["viewer", "player"]:
         raise HTTPException(status_code=403, detail="Permission denied to delete rosters")
 
@@ -677,20 +511,11 @@ def delete_roster(roster_name: str, request: Request, user: dict = Depends(get_c
 
     db["rosters"] = [r for r in rosters if r["name"].lower() != roster_name.lower()]
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="ROSTER_DELETED",
-        entity_type="roster",
-        entity_id=roster_name,
-        details={"roster_name": roster_name},
-        ip_address=request.client.host if request.client else None
-    )
     return {"status": "deleted"}
 
 # --- Resilient Chunked Video Ingestion with Fast-Start Relocation ---
 @app.post("/api/projects/{project_id}/upload-chunk")
 async def upload_video_chunk(
-    request: Request,
     project_id: str,
     chunk: UploadFile = File(...),
     chunk_index: int = Form(...),
@@ -737,30 +562,7 @@ async def upload_video_chunk(
 
         project["video_filename"] = safe_filename
         project["video_original_name"] = original_filename
-
-        # Generate 16:9 poster thumbnail frame at 5.0s for dashboard preview
-        thumb_filename = f"thumb_{project_id}.jpg"
-        thumb_path = THUMBS_DIR / thumb_filename
-        cmd_thumb = [
-            "ffmpeg", "-y",
-            "-ss", "00:00:05",
-            "-i", str(target_path),
-            "-vframes", "1",
-            "-vf", "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2",
-            str(thumb_path)
-        ]
-        subprocess.run(cmd_thumb, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        project["thumbnail_url"] = f"/media/thumbnails/{thumb_filename}"
-
         write_db(db)
-        log_audit_event(
-            actor=user,
-            action="VIDEO_UPLOAD_COMPLETED",
-            entity_type="project",
-            entity_id=project_id,
-            details={"filename": safe_filename, "original_filename": original_filename},
-            ip_address=request.client.host if request.client else None
-        )
         return {
             "status": "complete",
             "filename": safe_filename,
@@ -771,7 +573,6 @@ async def upload_video_chunk(
 
 @app.post("/api/projects/{project_id}/upload-cancel")
 def cancel_upload(
-    request: Request,
     project_id: str,
     upload_id: str = Form(...),
     original_filename: str = Form(...),
@@ -785,14 +586,6 @@ def cancel_upload(
     target_path = UPLOAD_DIR / safe_filename
     faststart_path = UPLOAD_DIR / f"faststart_{safe_filename}"
     cleanup_temp_files(target_path, faststart_path)
-    log_audit_event(
-        actor=user,
-        action="VIDEO_UPLOAD_CANCELLED",
-        entity_type="project",
-        entity_id=project_id,
-        details={"upload_id": upload_id, "original_filename": original_filename},
-        ip_address=request.client.host if request.client else None
-    )
     return {"status": "cancelled"}
 
 # --- Video Clipping & Editing Endpoints ---
@@ -817,7 +610,7 @@ class ClipUpdatePayload(BaseModel):
     notes: Optional[str] = ""
 
 @app.post("/api/clips")
-def create_clip(payload: ClipCreatePayload, request: Request, user: dict = Depends(get_current_user)):
+def create_clip(payload: ClipCreatePayload, user: dict = Depends(get_current_user)):
     check_project_access(user, payload.project_id)
     if user["role"] in ["viewer", "player"]:
         raise HTTPException(status_code=403, detail="Permission denied to slice clips")
@@ -905,23 +698,10 @@ def create_clip(payload: ClipCreatePayload, request: Request, user: dict = Depen
     }
     db["clips"].insert(0, clip_record)
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="CLIP_CREATED",
-        entity_type="clip",
-        entity_id=clip_id,
-        details={
-            "project_id": payload.project_id,
-            "categories": tags,
-            "players": tagged_players,
-            "duration": round(duration, 2)
-        },
-        ip_address=request.client.host if request.client else None
-    )
     return clip_record
 
 @app.put("/api/clips/{clip_id}")
-def update_clip(clip_id: str, payload: ClipUpdatePayload, request: Request, user: dict = Depends(get_current_user)):
+def update_clip(clip_id: str, payload: ClipUpdatePayload, user: dict = Depends(get_current_user)):
     db = read_db()
     clip = next((c for c in db["clips"] if c["id"] == clip_id), None)
     if not clip:
@@ -961,18 +741,6 @@ def update_clip(clip_id: str, payload: ClipUpdatePayload, request: Request, user
         clip["duration"] = round(max(0.0, clip["end_time"] - clip["start_time"]), 2)
 
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="CLIP_UPDATED",
-        entity_type="clip",
-        entity_id=clip_id,
-        details={
-            "categories": tags,
-            "players": pls,
-            "annotation": clip["annotation"]
-        },
-        ip_address=request.client.host if request.client else None
-    )
     return clip
 
 @app.get("/api/projects/{project_id}/clips")
@@ -982,7 +750,7 @@ def get_project_clips(project_id: str, user: dict = Depends(get_current_user)):
     return [c for c in db["clips"] if c["project_id"] == project_id]
 
 @app.delete("/api/clips/{clip_id}")
-def delete_clip(clip_id: str, request: Request, user: dict = Depends(get_current_user)):
+def delete_clip(clip_id: str, user: dict = Depends(get_current_user)):
     db = read_db()
     clip = next((c for c in db["clips"] if c["id"] == clip_id), None)
     if not clip:
@@ -1002,14 +770,6 @@ def delete_clip(clip_id: str, request: Request, user: dict = Depends(get_current
         r["clip_ids"] = [cid for cid in r.get("clip_ids", []) if cid != clip_id]
 
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="CLIP_DELETED",
-        entity_type="clip",
-        entity_id=clip_id,
-        details={"project_id": clip.get("project_id"), "filename": clip.get("filename")},
-        ip_address=request.client.host if request.client else None
-    )
     return {"status": "deleted"}
 
 # --- Player Vault Query Endpoint ---
@@ -1075,7 +835,7 @@ def list_reels(user: dict = Depends(get_current_user)):
     return db.get("reels", [])
 
 @app.post("/api/reels")
-def create_reel(payload: ReelCreatePayload, request: Request, user: dict = Depends(get_current_user)):
+def create_reel(payload: ReelCreatePayload, user: dict = Depends(get_current_user)):
     if user["role"] in ["viewer", "player"]:
         raise HTTPException(status_code=403, detail="Permission denied to create reels")
     db = read_db()
@@ -1089,18 +849,10 @@ def create_reel(payload: ReelCreatePayload, request: Request, user: dict = Depen
     }
     db["reels"].append(new_reel)
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="REEL_CREATED",
-        entity_type="reel",
-        entity_id=new_reel["id"],
-        details={"title": new_reel["title"]},
-        ip_address=request.client.host if request.client else None
-    )
     return new_reel
 
 @app.put("/api/reels/{reel_id}")
-def update_reel(reel_id: str, payload: ReelUpdatePayload, request: Request, user: dict = Depends(get_current_user)):
+def update_reel(reel_id: str, payload: ReelUpdatePayload, user: dict = Depends(get_current_user)):
     if user["role"] in ["viewer", "player"]:
         raise HTTPException(status_code=403, detail="Permission denied to modify reels")
     db = read_db()
@@ -1111,14 +863,6 @@ def update_reel(reel_id: str, payload: ReelUpdatePayload, request: Request, user
     reel["title"] = payload.title.strip()
     reel["description"] = payload.description.strip()
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="REEL_UPDATED",
-        entity_type="reel",
-        entity_id=reel_id,
-        details={"title": reel["title"]},
-        ip_address=request.client.host if request.client else None
-    )
     return reel
 
 @app.get("/api/reels/{reel_id}")
@@ -1136,7 +880,7 @@ def get_reel(reel_id: str, user: dict = Depends(get_current_user)):
     }
 
 @app.put("/api/reels/{reel_id}/clips")
-def update_reel_clips(reel_id: str, payload: ReelUpdateClipsPayload, request: Request, user: dict = Depends(get_current_user)):
+def update_reel_clips(reel_id: str, payload: ReelUpdateClipsPayload, user: dict = Depends(get_current_user)):
     if user["role"] in ["viewer", "player"]:
         raise HTTPException(status_code=403, detail="Permission denied to modify reels")
     db = read_db()
@@ -1146,18 +890,10 @@ def update_reel_clips(reel_id: str, payload: ReelUpdateClipsPayload, request: Re
     
     reel["clip_ids"] = payload.clip_ids
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="REEL_CLIPS_REORDERED",
-        entity_type="reel",
-        entity_id=reel_id,
-        details={"clip_count": len(payload.clip_ids)},
-        ip_address=request.client.host if request.client else None
-    )
     return reel
 
 @app.post("/api/reels/{reel_id}/add-clip")
-def add_clip_to_reel(reel_id: str, request: Request, clip_id: str = Form(...), user: dict = Depends(get_current_user)):
+def add_clip_to_reel(reel_id: str, clip_id: str = Form(...), user: dict = Depends(get_current_user)):
     if user["role"] in ["viewer", "player"]:
         raise HTTPException(status_code=403, detail="Permission denied to modify reels")
     db = read_db()
@@ -1168,32 +904,15 @@ def add_clip_to_reel(reel_id: str, request: Request, clip_id: str = Form(...), u
     if clip_id not in reel.get("clip_ids", []):
         reel.setdefault("clip_ids", []).append(clip_id)
         write_db(db)
-        log_audit_event(
-            actor=user,
-            action="REEL_CLIP_ADDED",
-            entity_type="reel",
-            entity_id=reel_id,
-            details={"clip_id": clip_id, "title": reel.get("title")},
-            ip_address=request.client.host if request.client else None
-        )
     return reel
 
 @app.delete("/api/reels/{reel_id}")
-def delete_reel(reel_id: str, request: Request, user: dict = Depends(get_current_user)):
+def delete_reel(reel_id: str, user: dict = Depends(get_current_user)):
     if user["role"] in ["viewer", "player"]:
         raise HTTPException(status_code=403, detail="Permission denied to delete reels")
     db = read_db()
-    target_reel = next((r for r in db["reels"] if r["id"] == reel_id), None)
     db["reels"] = [r for r in db["reels"] if r["id"] != reel_id]
     write_db(db)
-    log_audit_event(
-        actor=user,
-        action="REEL_DELETED",
-        entity_type="reel",
-        entity_id=reel_id,
-        details={"title": target_reel.get("title") if target_reel else None},
-        ip_address=request.client.host if request.client else None
-    )
     return {"status": "deleted"}
 
 # --- Player Photos Management ---
@@ -1208,7 +927,6 @@ def get_player_photos(user: dict = Depends(get_current_user)):
 
 @app.post("/api/players/photo")
 async def upload_player_photo(
-    request: Request,
     player_name: str = Form(...),
     photo: UploadFile = File(...),
     user: dict = Depends(get_current_user)
@@ -1252,14 +970,6 @@ async def upload_player_photo(
     photos[clean_player] = unique_filename
     write_db(db)
 
-    log_audit_event(
-        actor=user,
-        action="PLAYER_PHOTO_UPLOADED",
-        entity_type="player_photo",
-        entity_id=clean_player,
-        details={"filename": unique_filename},
-        ip_address=request.client.host if request.client else None
-    )
     return {
         "status": "uploaded",
         "player_name": clean_player,
@@ -1267,7 +977,7 @@ async def upload_player_photo(
     }
 
 @app.delete("/api/players/photo")
-def delete_player_photo(player_name: str, request: Request, user: dict = Depends(get_current_user)):
+def delete_player_photo(player_name: str, user: dict = Depends(get_current_user)):
     clean_player = player_name.strip()
     if user["role"] == "viewer":
         raise HTTPException(status_code=403, detail="Permission denied")
@@ -1286,14 +996,6 @@ def delete_player_photo(player_name: str, request: Request, user: dict = Depends
                 pass
         write_db(db)
 
-    log_audit_event(
-        actor=user,
-        action="PLAYER_PHOTO_DELETED",
-        entity_type="player_photo",
-        entity_id=clean_player,
-        details={"player_name": clean_player},
-        ip_address=request.client.host if request.client else None
-    )
     return {"status": "deleted", "player_name": clean_player}
 
 def cleanup_temp_files(*paths: Path):
@@ -1306,7 +1008,7 @@ def cleanup_temp_files(*paths: Path):
 
 # --- Backup & Restore (Admin Only) ---
 @app.get("/api/admin/backup")
-def backup_all_data(request: Request, user: dict = Depends(get_current_user)):
+def backup_all_data(user: dict = Depends(get_current_user)):
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
 
@@ -1356,14 +1058,6 @@ def backup_all_data(request: Request, user: dict = Depends(get_current_user)):
     stamp = time.strftime("%Y%m%d_%H%M%S")
     zip_filename = f"film_room_backup_{APP_ENV_LABEL.lower()}_{stamp}.zip"
 
-    log_audit_event(
-        actor=user,
-        action="DATA_BACKUP_EXPORTED",
-        entity_type="admin",
-        details={"filename": zip_filename, "size_bytes": total_bytes},
-        ip_address=request.client.host if request.client else None
-    )
-
     return StreamingResponse(
         backup_buffer,
         media_type="application/zip",
@@ -1376,7 +1070,6 @@ def backup_all_data(request: Request, user: dict = Depends(get_current_user)):
 
 @app.post("/api/admin/restore")
 async def restore_all_data(
-    request: Request,
     backup: UploadFile = File(...),
     overwrite: bool = Form(True),
     user: dict = Depends(get_current_user)
@@ -1471,19 +1164,6 @@ async def restore_all_data(
                 pass
         raise HTTPException(status_code=500, detail=f"Restore failed: {e}")
 
-    log_audit_event(
-        actor=user,
-        action="DATA_RESTORED",
-        entity_type="admin",
-        details={
-            "restored_files": restored_files,
-            "users": len(restored_db.get("users", [])),
-            "projects": len(restored_db.get("projects", [])),
-            "clips": len(restored_db.get("clips", []))
-        },
-        ip_address=request.client.host if request.client else None
-    )
-
     return {
         "status": "restored",
         "overwrite": overwrite,
@@ -1497,7 +1177,7 @@ async def restore_all_data(
 
 # --- Highlight Reel Concatenation Export ---
 @app.get("/api/reels/{reel_id}/export-video")
-def export_reel_concatenated_video(reel_id: str, request: Request, user: dict = Depends(get_current_user)):
+def export_reel_concatenated_video(reel_id: str, user: dict = Depends(get_current_user)):
     db = read_db()
     reel = next((r for r in db["reels"] if r["id"] == reel_id), None)
     if not reel:
@@ -1566,14 +1246,6 @@ def export_reel_concatenated_video(reel_id: str, request: Request, user: dict = 
             pass
 
     download_name = f"{sanitize_for_filename(reel['title'], default='Highlight_Reel')}.mp4"
-    log_audit_event(
-        actor=user,
-        action="REEL_VIDEO_EXPORTED",
-        entity_type="reel",
-        entity_id=reel_id,
-        details={"title": reel.get("title"), "download_name": download_name},
-        ip_address=request.client.host if request.client else None
-    )
     return FileResponse(
         path=str(output_video_path),
         media_type="application/octet-stream",
@@ -1586,7 +1258,7 @@ def export_reel_concatenated_video(reel_id: str, request: Request, user: dict = 
     )
 
 @app.get("/api/projects/{project_id}/export-zip")
-def export_project_clips_zip(project_id: str, request: Request, category: Optional[str] = None, user: dict = Depends(get_current_user)):
+def export_project_clips_zip(project_id: str, category: Optional[str] = None, user: dict = Depends(get_current_user)):
     check_project_access(user, project_id)
     db = read_db()
     project = next((p for p in db["projects"] if p["id"] == project_id), None)
@@ -1624,15 +1296,6 @@ def export_project_clips_zip(project_id: str, request: Request, category: Option
     zip_buffer.seek(0)
     zip_filename = f"{project['name'].replace(' ', '_')}_clips.zip"
     
-    log_audit_event(
-        actor=user,
-        action="PROJECT_ZIP_EXPORTED",
-        entity_type="project",
-        entity_id=project_id,
-        details={"exported_clips": len(clips), "category_filter": category},
-        ip_address=request.client.host if request.client else None
-    )
-
     return StreamingResponse(
         zip_buffer,
         media_type="application/zip",
