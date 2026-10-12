@@ -5215,20 +5215,17 @@
       } else {
         if (playerSelectionCard) playerSelectionCard.classList.remove('hidden');
 
-        // Preserve an already-chosen roster across view switches; otherwise
-        // default to the first roster (not "All") so the player dropdown
-        // always has a concrete roster to draw from.
+        // Populate the roster dropdown from the loaded rosters.
         const rosterSelect = document.getElementById('profileRosterSelect');
-        const previousRoster = rosterSelect.value;
         rosterSelect.innerHTML = rosters.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
 
-        if (previousRoster && rosters.some(r => r.name === previousRoster)) {
-          rosterSelect.value = previousRoster;
-        } else if (rosters.length > 0) {
+        // Default to the first roster if nothing is selected yet, otherwise
+        // keep whatever roster the user had picked.
+        if (!rosterSelect.value && rosters.length > 0) {
           rosterSelect.value = rosters[0].name;
         }
 
-        // New roster → clear out any player carried over from a different roster.
+        // Clear the current player so the user must pick from the selected roster.
         selectedProfilePlayer = null;
         onProfileRosterChanged();
       }
@@ -5377,7 +5374,7 @@
       const chipsContainer = document.getElementById('profilePlayerChipsContainer');
       const countBadge = document.getElementById('playerSelectCountBadge');
 
-      // A specific roster must be chosen; we no longer aggregate across all rosters.
+      // Build the player list strictly from the chosen roster.
       let playerList = [];
       if (rosterName) {
         const r = rosters.find(x => x.name.toLowerCase() === rosterName.toLowerCase());
@@ -5412,8 +5409,7 @@
         }
       }
 
-      // If the previously selected player belongs to this roster, keep them;
-      // otherwise clear the selection so the user must pick from this roster.
+      // Keep the previously selected player only if they belong to the chosen roster.
       if (selectedProfilePlayer && playerList.includes(selectedProfilePlayer)) {
         if (playerSelect) playerSelect.value = selectedProfilePlayer;
         updatePlayerAvatarUI(selectedProfilePlayer);
