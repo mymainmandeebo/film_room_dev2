@@ -575,6 +575,24 @@
         padding-left: 10px !important;
         padding-right: 10px !important;
       }
+      #videoControlsOverlay #overlayTimelinePlayhead {
+        width: 20px;
+        margin-left: -10px;
+      }
+      #videoControlsOverlay #overlayTimeReadout,
+      #videoControlsOverlay #overlayDurationReadout {
+        display: none;
+      }
+      #videoControlsOverlay #overlayTimelineWrap {
+        order: 3;
+        flex-basis: 100%;
+        margin-top: 2px;
+      }
+    }
+    /* Overlay timeline scrubber — mirrors the main timelineTrack styling */
+    #overlayTimelineTrack {
+      user-select: none;
+      touch-action: none;
     }
   </style>
 </head>
@@ -1314,6 +1332,19 @@
                 <option value="2.0" class="bg-neutral-900 text-white">2.0x</option>
               </select>
             </div>
+
+          <!-- Overlay Timeline Scrubber (mirrors the main timeline below the video) -->
+          <div id="overlayTimelineWrap" class="w-full order-last flex items-center gap-2">
+            <span id="overlayTimeReadout" class="font-mono text-[11px] font-bold text-white/90 w-14 text-left shrink-0 pointer-events-none select-none">00:00.00</span>
+            <div id="overlayTimelineTrack" class="timeline-scrubber relative flex-1 h-4 min-w-[80px] bg-white/20 rounded-md-sm cursor-pointer flex items-center select-none overflow-visible">
+              <div id="overlayTimelineProgress" class="absolute left-0 top-2 bottom-2 bg-md-primary dark:bg-md-dark-primary rounded-l pointer-events-none" style="width: 0%;"></div>
+              <div id="overlayTimelineMarkerRange" class="absolute top-1 bottom-1 bg-md-tertiary/30 dark:bg-md-dark-tertiary/30 border-l border-r border-md-tertiary dark:border-md-dark-tertiary pointer-events-none hidden"></div>
+              <div id="overlayTimelineEventDot" class="absolute top-0 bottom-0 w-2 bg-md-tertiary dark:bg-md-dark-tertiary rounded pointer-events-none hidden transform -translate-x-1/2"></div>
+              <div id="overlayTimelinePlayhead" class="absolute top-0 bottom-0 w-5 -ml-2.5 bg-white dark:bg-md-dark-on-surface border border-md-outline dark:border-md-dark-outline rounded-full shadow-md-2 pointer-events-none" style="left: 0%;"></div>
+              <div id="overlayTimelineTooltip" class="absolute -top-8 transform -translate-x-1/2 bg-md-inverse-surface dark:bg-md-dark-inverse-surface text-md-inverse-on-surface dark:text-md-dark-inverse-on-surface border border-md-outline-variant dark:border-md-dark-outline-variant px-2 py-0.5 rounded-md-xs text-xs font-mono pointer-events-none hidden whitespace-nowrap shadow-md-2 z-30">00:00.00</div>
+            </div>
+            <span id="overlayDurationReadout" class="font-mono text-[11px] font-bold text-white/70 w-14 text-right shrink-0 pointer-events-none select-none">00:00.00</span>
+          </div>
           </div>
         
           <!-- Empty-state / upload overlay stays inside the video frame. -->
@@ -1879,6 +1910,13 @@
     const timelineTooltip = document.getElementById('timelineTooltip');
     const timelineMarkerRange = document.getElementById('timelineMarkerRange');
     const timelineEventDot = document.getElementById('timelineEventDot');
+
+    const overlayTimelineTrack = document.getElementById('overlayTimelineTrack');
+    const overlayTimelineProgress = document.getElementById('overlayTimelineProgress');
+    const overlayTimelinePlayhead = document.getElementById('overlayTimelinePlayhead');
+    const overlayTimelineTooltip = document.getElementById('overlayTimelineTooltip');
+    const overlayTimelineMarkerRange = document.getElementById('overlayTimelineMarkerRange');
+    const overlayTimelineEventDot = document.getElementById('overlayTimelineEventDot');
 
     const muteBtn = document.getElementById('muteBtn');
     const muteIcon = document.getElementById('muteIcon');
@@ -4180,23 +4218,37 @@
       timelinePlayhead.style.left = `${pct}%`;
       document.getElementById('currentTimeDisplay').innerText = formatTime(video.currentTime);
       document.getElementById('durationDisplay').innerText = formatTime(video.duration);
+
+      // Mirror the playhead / progress onto the overlay timeline inside the video frame.
+      if (overlayTimelineProgress) overlayTimelineProgress.style.width = `${pct}%`;
+      if (overlayTimelinePlayhead) overlayTimelinePlayhead.style.left = `${pct}%`;
+      if (overlayTimeReadoutEl) overlayTimeReadoutEl.innerText = formatTime(video.currentTime);
+      if (overlayDurationReadoutEl) overlayDurationReadoutEl.innerText = formatTime(video.duration);
     }
 
     function updateTimelineMarkerOverlay(mark) {
-      if (!video.duration || !mark) {
-        timelineMarkerRange.classList.add('hidden');
-        timelineEventDot.classList.add('hidden');
-        return;
-      }
-      const leftPct = (mark.startTime / video.duration) * 100;
-      const widthPct = ((mark.endTime - mark.startTime) / video.duration) * 100;
-      timelineMarkerRange.style.left = `${leftPct}%`;
-      timelineMarkerRange.style.width = `${widthPct}%`;
-      timelineMarkerRange.classList.remove('hidden');
+      // Update both the main timeline (below the video) and the overlay timeline
+      // (inside the video frame) with the current pending-mark range + event dot.
+      const applyMarker = (rangeEl, dotEl) => {
+        if (!rangeEl || !dotEl) return;
+        if (!video.duration || !mark) {
+          rangeEl.classList.add('hidden');
+          dotEl.classList.add('hidden');
+          return;
+        }
+        const leftPct = (mark.startTime / video.duration) * 100;
+        const widthPct = ((mark.endTime - mark.startTime) / video.duration) * 100;
+        rangeEl.style.left = `${leftPct}%`;
+        rangeEl.style.width = `${widthPct}%`;
+        rangeEl.classList.remove('hidden');
 
-      const eventPct = (mark.eventTime / video.duration) * 100;
-      timelineEventDot.style.left = `${eventPct}%`;
-      timelineEventDot.classList.remove('hidden');
+        const eventPct = (mark.eventTime / video.duration) * 100;
+        dotEl.style.left = `${eventPct}%`;
+        dotEl.classList.remove('hidden');
+      };
+
+      applyMarker(timelineMarkerRange, timelineEventDot);
+      applyMarker(overlayTimelineMarkerRange, overlayTimelineEventDot);
     }
 
     function getTrackPercentageFromClientX(clientX) {
@@ -4204,6 +4256,85 @@
       const pos = Math.max(0, Math.min(clientX - rect.left, rect.width));
       return pos / rect.width;
     }
+
+    // --- Overlay Timeline Scrubber (inside the video frame) ---
+    const overlayTimeReadoutEl = document.getElementById('overlayTimeReadout');
+    const overlayDurationReadoutEl = document.getElementById('overlayDurationReadout');
+    let isOverlayScrubbing = false;
+
+    function getOverlayTrackPercentage(clientX) {
+      if (!overlayTimelineTrack) return 0;
+      const rect = overlayTimelineTrack.getBoundingClientRect();
+      const pos = Math.max(0, Math.min(clientX - rect.left, rect.width));
+      return rect.width > 0 ? pos / rect.width : 0;
+    }
+
+    function seekOverlayTimelineFromCoord(clientX) {
+      if (!video.duration) return;
+      const pct = getOverlayTrackPercentage(clientX);
+      video.currentTime = pct * video.duration;
+      updateTimelineUI();
+    }
+
+    function showOverlayTimelineTooltip(clientX) {
+      if (!video.duration || !overlayTimelineTooltip || !overlayTimelineTrack) return;
+      const pct = getOverlayTrackPercentage(clientX);
+      overlayTimelineTooltip.style.left = `${pct * 100}%`;
+      overlayTimelineTooltip.innerText = formatTime(pct * video.duration);
+      overlayTimelineTooltip.classList.remove('hidden');
+    }
+
+    function hideOverlayTimelineTooltip() {
+      if (overlayTimelineTooltip) overlayTimelineTooltip.classList.add('hidden');
+    }
+
+    if (overlayTimelineTrack) {
+      overlayTimelineTrack.addEventListener('mousedown', (e) => {
+        isOverlayScrubbing = true;
+        seekOverlayTimelineFromCoord(e.clientX);
+        showOverlayTimelineTooltip(e.clientX);
+      });
+
+      overlayTimelineTrack.addEventListener('mousemove', (e) => {
+        if (isOverlayScrubbing) seekOverlayTimelineFromCoord(e.clientX);
+        showOverlayTimelineTooltip(e.clientX);
+      });
+
+      overlayTimelineTrack.addEventListener('mouseleave', () => {
+        if (!isOverlayScrubbing) hideOverlayTimelineTooltip();
+      });
+
+      overlayTimelineTrack.addEventListener('touchstart', (e) => {
+        isOverlayScrubbing = true;
+        seekOverlayTimelineFromCoord(e.touches[0].clientX);
+        showOverlayTimelineTooltip(e.touches[0].clientX);
+      }, { passive: true });
+
+      overlayTimelineTrack.addEventListener('touchmove', (e) => {
+        if (isOverlayScrubbing && e.touches.length > 0) {
+          seekOverlayTimelineFromCoord(e.touches[0].clientX);
+          showOverlayTimelineTooltip(e.touches[0].clientX);
+        }
+      }, { passive: true });
+
+      overlayTimelineTrack.addEventListener('touchend', () => {
+        isOverlayScrubbing = false;
+        hideOverlayTimelineTooltip();
+      });
+    }
+
+    window.addEventListener('mousemove', (e) => {
+      if (isOverlayScrubbing) seekOverlayTimelineFromCoord(e.clientX);
+    });
+    window.addEventListener('mouseup', () => {
+      if (isOverlayScrubbing) {
+        isOverlayScrubbing = false;
+        hideOverlayTimelineTooltip();
+      }
+    });
+    window.addEventListener('touchend', () => {
+      isOverlayScrubbing = false;
+    });
 
     function seekTimelineFromCoord(clientX) {
       if (!video.duration) return;
