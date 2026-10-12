@@ -1213,9 +1213,61 @@
           </div>
         </div>
 
-        <div id="videoContainer" class="relative bg-black rounded-md-lg overflow-hidden border border-md-outline-variant dark:border-md-dark-outline-variant flex items-center justify-center w-full aspect-video max-h-[50vh] lg:max-h-[540px] shadow-sm">
+        <div id="videoContainer" class="group relative bg-black rounded-md-lg overflow-hidden border border-md-outline-variant dark:border-md-dark-outline-variant flex items-center justify-center w-full aspect-video max-h-[50vh] lg:max-h-[540px] shadow-sm">
           <video id="videoPlayer" playsinline webkit-playsinline class="w-full h-full object-contain"></video>
-          <canvas id="telestrationCanvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+          <canvas id="telestrationCanvas" class="absolute top-0 left-0 w-full h-full z-10"></canvas>
+        
+          <!-- Overlay Controls Bar -->
+          <div id="videoControlsOverlay" class="absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2.5 px-4 py-2 rounded-full bg-black/60 dark:bg-black/75 backdrop-blur-md border border-white/15 text-white shadow-md-3 transition-opacity duration-200">
+            <!-- Left: Playback & Tagging Actions -->
+            <div class="flex items-center gap-1.5">
+              <button id="jumpBackBtn" class="p-2 rounded-full hover:bg-white/10 transition text-white/90" title="Jump back 5s">
+                <span class="material-symbols-outlined" style="font-size: 22px;">replay_5</span>
+              </button>
+              <button id="stepBackBtn" class="p-2 rounded-full hover:bg-white/10 transition text-white/90" title="Step back 1 frame">
+                <span class="material-symbols-outlined" style="font-size: 22px;">skip_previous</span>
+              </button>
+              <button id="playPauseBtn" class="md-btn-filled bg-md-primary dark:bg-md-dark-primary text-md-on-primary dark:text-md-dark-on-primary !py-2 !px-5 !text-sm !rounded-full min-w-[90px] shadow-sm">
+                <span class="material-symbols-outlined" style="font-size: 20px;">play_arrow</span>
+                Play
+              </button>
+              <button id="stepForwardBtn" class="p-2 rounded-full hover:bg-white/10 transition text-white/90" title="Step forward 1 frame">
+                <span class="material-symbols-outlined" style="font-size: 22px;">skip_next</span>
+              </button>
+              <button id="jumpForwardBtn" class="p-2 rounded-full hover:bg-white/10 transition text-white/90" title="Jump forward 5s">
+                <span class="material-symbols-outlined" style="font-size: 22px;">forward_5</span>
+              </button>
+              <button id="markEventBtn" class="md-btn-filled bg-md-tertiary dark:bg-md-dark-tertiary text-md-on-tertiary dark:text-md-dark-on-tertiary role-editor !py-2 !px-4 !text-sm !rounded-full shadow-md-1">
+                <span class="material-symbols-outlined filled" style="font-size: 18px;">bolt</span>
+                Mark Event (K)
+              </button>
+            </div>
+        
+            <!-- Right: Volume & Playback Speed -->
+            <div class="flex items-center gap-3 ml-auto">
+              <div class="flex items-center gap-2 bg-white/10 border border-white/20 px-3 py-1.5 rounded-full">
+                <button id="muteBtn" class="text-white hover:text-md-primary transition p-0.5" title="Toggle Mute (Key: M)">
+                  <span id="muteIcon" class="material-symbols-outlined" style="font-size: 20px;">volume_up</span>
+                </button>
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1" class="w-16 sm:w-20 md-slider bg-white/30 accent-white">
+                <span id="volumePct" class="font-mono text-xs text-white/80 w-7 text-right hidden sm:inline">100%</span>
+              </div>
+        
+              <select id="playbackRate" class="bg-white/10 border border-white/20 rounded-full px-2.5 py-1 text-xs font-semibold text-white focus:outline-none focus:bg-black/80 cursor-pointer">
+                <option value="0.25" class="bg-neutral-900 text-white">0.25x</option>
+                <option value="0.5" class="bg-neutral-900 text-white">0.5x</option>
+                <option value="1" selected class="bg-neutral-900 text-white">1.0x</option>
+                <option value="1.5" class="bg-neutral-900 text-white">1.5x</option>
+                <option value="2.0" class="bg-neutral-900 text-white">2.0x</option>
+              </select>
+            </div>
+          </div>
+        
+          <!-- Keep your existing noVideoMsg modal -->
+          <div id="noVideoMsg" class="absolute inset-0 flex flex-col items-center justify-center text-white/70 bg-black/90 p-6 text-center gap-4 z-30">
+            <!-- ... unchanged content ... -->
+          </div>
+        </div>
 
           <div id="noVideoMsg" class="absolute inset-0 flex flex-col items-center justify-center text-white/70 bg-black/90 p-6 text-center gap-4">
             <span class="material-symbols-outlined" style="font-size: 64px; opacity: 0.5;">videocam_off</span>

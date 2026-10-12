@@ -487,6 +487,38 @@
     html.compact [class~="mt-4"] { margin-top: 0.6rem !important; }
     html.compact [class~="mb-2"] { margin-bottom: 0.3rem !important; }
 
+    /* --- Alignment helpers ---
+       Keep icon-only buttons at a consistent hit-target height with their
+       labeled neighbors, and align quick-toggle rows so wrapped items
+       still line up on a common baseline. */
+    .icon-btn-square {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .action-row > * {
+      min-height: 36px;
+    }
+    .quick-toggle-row {
+      align-items: center;
+      row-gap: 6px;
+      column-gap: 6px;
+    }
+    .quick-toggle-row .quick-toggle-btn,
+    .quick-toggle-row .playtype-toggle-btn {
+      height: 30px;
+    }
+
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #79747E; border-radius: 4px; }
@@ -1181,59 +1213,42 @@
           </div>
         </div>
 
-        <div id="videoContainer" class="group relative bg-black rounded-md-lg overflow-hidden border border-md-outline-variant dark:border-md-dark-outline-variant flex items-center justify-center w-full aspect-video max-h-[50vh] lg:max-h-[540px] shadow-sm">
+        <div id="videoContainer" class="relative bg-black rounded-md-lg overflow-hidden border border-md-outline-variant dark:border-md-dark-outline-variant flex items-center justify-center w-full aspect-video max-h-[50vh] lg:max-h-[540px] shadow-sm">
           <video id="videoPlayer" playsinline webkit-playsinline class="w-full h-full object-contain"></video>
-          <canvas id="telestrationCanvas" class="absolute top-0 left-0 w-full h-full z-10"></canvas>
-        
-          <!-- Overlay Controls Bar -->
-          <div id="videoControlsOverlay" class="absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2.5 px-4 py-2 rounded-full bg-black/60 dark:bg-black/75 backdrop-blur-md border border-white/15 text-white shadow-md-3 transition-opacity duration-200">
-            <!-- Left: Playback & Tagging Actions -->
-            <div class="flex items-center gap-1.5">
-              <button id="jumpBackBtn" class="p-2 rounded-full hover:bg-white/10 transition text-white/90" title="Jump back 5s">
-                <span class="material-symbols-outlined" style="font-size: 22px;">replay_5</span>
-              </button>
-              <button id="stepBackBtn" class="p-2 rounded-full hover:bg-white/10 transition text-white/90" title="Step back 1 frame">
-                <span class="material-symbols-outlined" style="font-size: 22px;">skip_previous</span>
-              </button>
-              <button id="playPauseBtn" class="md-btn-filled bg-md-primary dark:bg-md-dark-primary text-md-on-primary dark:text-md-dark-on-primary !py-2 !px-5 !text-sm !rounded-full min-w-[90px] shadow-sm">
-                <span class="material-symbols-outlined" style="font-size: 20px;">play_arrow</span>
-                Play
-              </button>
-              <button id="stepForwardBtn" class="p-2 rounded-full hover:bg-white/10 transition text-white/90" title="Step forward 1 frame">
-                <span class="material-symbols-outlined" style="font-size: 22px;">skip_next</span>
-              </button>
-              <button id="jumpForwardBtn" class="p-2 rounded-full hover:bg-white/10 transition text-white/90" title="Jump forward 5s">
-                <span class="material-symbols-outlined" style="font-size: 22px;">forward_5</span>
-              </button>
-              <button id="markEventBtn" class="md-btn-filled bg-md-tertiary dark:bg-md-dark-tertiary text-md-on-tertiary dark:text-md-dark-on-tertiary role-editor !py-2 !px-4 !text-sm !rounded-full shadow-md-1">
-                <span class="material-symbols-outlined filled" style="font-size: 18px;">bolt</span>
-                Mark Event (K)
-              </button>
+          <canvas id="telestrationCanvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+
+          <div id="noVideoMsg" class="absolute inset-0 flex flex-col items-center justify-center text-white/70 bg-black/90 p-6 text-center gap-4">
+            <span class="material-symbols-outlined" style="font-size: 64px; opacity: 0.5;">videocam_off</span>
+            <p id="noVideoText" class="text-base sm:text-lg font-medium text-white/80">No video uploaded for this specific game project.</p>
+            <div id="workspaceUploadActionArea" class="flex flex-col items-center gap-3">
+              <label id="uploadVideoLabel" class="md-btn-filled bg-md-primary dark:bg-md-dark-primary text-md-on-primary dark:text-md-dark-on-primary cursor-pointer role-editor">
+                <span class="material-symbols-outlined" style="font-size: 20px;">upload</span>
+                Upload Game Video (.mp4)
+                <input type="file" id="videoFileInput" accept="video/*" class="hidden">
+              </label>
+              <p class="text-xs text-white/50">or drag and drop video file here</p>
             </div>
-        
-            <!-- Right: Volume & Playback Speed -->
-            <div class="flex items-center gap-3 ml-auto">
-              <div class="flex items-center gap-2 bg-white/10 border border-white/20 px-3 py-1.5 rounded-full">
-                <button id="muteBtn" class="text-white hover:text-md-primary transition p-0.5" title="Toggle Mute (Key: M)">
-                  <span id="muteIcon" class="material-symbols-outlined" style="font-size: 20px;">volume_up</span>
-                </button>
-                <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1" class="w-16 sm:w-20 md-slider bg-white/30 accent-white">
-                <span id="volumePct" class="font-mono text-xs text-white/80 w-7 text-right hidden sm:inline">100%</span>
+
+            <div id="uploadProgressBox" class="w-full max-w-sm flex flex-col gap-2 hidden text-left bg-md-surface-container-high dark:bg-md-dark-surface-container-high p-4 rounded-md-lg border border-md-outline-variant dark:border-md-dark-outline-variant shadow-md-2">
+              <div class="flex justify-between items-center text-sm font-medium">
+                <span id="uploadStatusText" class="text-md-on-surface dark:text-md-dark-on-surface font-semibold">Uploading in background...</span>
+                <span id="uploadPercentText" class="font-mono font-bold text-md-primary dark:text-md-dark-primary">0%</span>
               </div>
-        
-              <select id="playbackRate" class="bg-white/10 border border-white/20 rounded-full px-2.5 py-1 text-xs font-semibold text-white focus:outline-none focus:bg-black/80 cursor-pointer">
-                <option value="0.25" class="bg-neutral-900 text-white">0.25x</option>
-                <option value="0.5" class="bg-neutral-900 text-white">0.5x</option>
-                <option value="1" selected class="bg-neutral-900 text-white">1.0x</option>
-                <option value="1.5" class="bg-neutral-900 text-white">1.5x</option>
-                <option value="2.0" class="bg-neutral-900 text-white">2.0x</option>
-              </select>
+              <div class="w-full h-2 bg-md-surface-container-highest dark:bg-md-dark-surface-container-highest rounded-full overflow-hidden">
+                <div id="uploadProgressBar" class="h-full bg-md-primary dark:bg-md-dark-primary rounded-full transition-all duration-150 ease-out" style="width: 0%;"></div>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-md-on-surface-variant dark:text-md-dark-on-surface-variant italic">You can freely navigate away while uploading.</span>
+                <button type="button" id="workspaceCancelUploadBtn" class="text-xs text-md-error dark:text-md-dark-error hover:underline font-medium flex items-center gap-1">
+                  <span class="material-symbols-outlined" style="font-size: 14px;">cancel</span>
+                  Cancel
+                </button>
+              </div>
+              <div class="flex justify-between items-center text-xs text-md-on-surface-variant dark:text-md-dark-on-surface-variant font-mono">
+                <span id="uploadBytesText">0 MB / 0 MB</span>
+                <span id="uploadSpeedText">0 MB/s</span>
+              </div>
             </div>
-          </div>
-        
-          <!-- Keep your existing noVideoMsg modal -->
-          <div id="noVideoMsg" class="absolute inset-0 flex flex-col items-center justify-center text-white/70 bg-black/90 p-6 text-center gap-4 z-30">
-            <!-- ... unchanged content ... -->
           </div>
         </div>
 
@@ -1256,10 +1271,10 @@
             <span>PiP</span>
           </button>
 
-          <button type="button" id="qtSpeedBtn" class="quick-toggle-btn" title="Cycle playback speed (0.5x / 1x / 1.5x / 2x)">
+<!--           <button type="button" id="qtSpeedBtn" class="quick-toggle-btn" title="Cycle playback speed (0.5x / 1x / 1.5x / 2x)">
             <span class="material-symbols-outlined">speed</span>
             <span id="qtSpeedLabel">1.0x</span>
-          </button>
+          </button> -->
 
           <span class="w-px h-5 bg-md-outline-variant dark:bg-md-dark-outline-variant mx-0.5 shrink-0 hidden sm:inline"></span>
 
@@ -1316,12 +1331,13 @@
             <button id="jumpForwardBtn" class="md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant !p-2 !rounded-full" title="Jump forward 5s">
               <span class="material-symbols-outlined" style="font-size: 22px;">forward_5</span>
             </button>
+            <button id="markEventBtn" class="md-btn-filled bg-md-tertiary dark:bg-md-dark-tertiary text-md-on-tertiary dark:text-md-dark-on-tertiary role-editor !py-2.5 !px-5 !text-base shadow-md-1">
+              <span class="material-symbols-outlined filled" style="font-size: 20px;">bolt</span>
+              Mark Event (K)
+            </button>
           </div>
 
-          <button id="markEventBtn" class="md-btn-filled bg-md-tertiary dark:bg-md-dark-tertiary text-md-on-tertiary dark:text-md-dark-on-tertiary role-editor !py-2.5 !px-5 !text-base shadow-md-1">
-            <span class="material-symbols-outlined filled" style="font-size: 20px;">bolt</span>
-            Mark Event (K)
-          </button>
+
 
           <div class="flex items-center gap-3 ml-auto">
             <div class="flex items-center gap-2 bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant px-3 py-1.5 rounded-full">
@@ -1339,12 +1355,12 @@
               <option value="1.5">1.5x</option>
               <option value="2.0">2.0x</option>
             </select>
-            <button id="telestrationToggle" class="md-btn-filled bg-md-tertiary dark:bg-md-dark-tertiary text-md-on-tertiary dark:text-md-dark-on-tertiary !py-2 !px-3.5 !rounded-full" title="Toggle Drawing Mode">
+            <!-- <button id="telestrationToggle" class="md-btn-filled bg-md-tertiary dark:bg-md-dark-tertiary text-md-on-tertiary dark:text-md-dark-on-tertiary !py-2 !px-3.5 !rounded-full" title="Toggle Drawing Mode">
               <span class="material-symbols-outlined" style="font-size: 20px;">draw</span>
-            </button>
-            <button id="clearDrawingBtn" class="md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant !py-2 !px-3.5 !rounded-full" title="Clear Drawings">
+            </button> -->
+            <!-- <button id="clearDrawingBtn" class="md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant !py-2 !px-3.5 !rounded-full" title="Clear Drawings">
               <span class="material-symbols-outlined" style="font-size: 20px;">delete</span>
-            </button>
+            </button> -->
           </div>
         </div>
       </div>
