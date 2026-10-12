@@ -1289,7 +1289,7 @@
           <canvas id="telestrationCanvas" class="absolute top-0 left-0 w-full h-full z-10"></canvas>
         
           <!-- Overlay Controls Bar -->
-          <div id="videoControlsOverlay" class="absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2.5 px-4 py-2 rounded-full bg-black/60 dark:bg-black/75 backdrop-blur-md border border-white/15 text-white shadow-md-3 transition-opacity duration-200">
+          <div id="videoControlsOverlay" class="absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2.5 px-4 py-2 rounded-[28px] bg-black/60 dark:bg-black/75 backdrop-blur-md border border-white/15 text-white shadow-md-3 transition-opacity duration-200">
             <!-- Left: Playback & Tagging Actions -->
             <div class="flex items-center gap-1.5">
               <button id="jumpBackBtn" class="p-2 rounded-full hover:bg-white/10 transition text-white/90" title="Jump back 5s">
@@ -1333,18 +1333,18 @@
               </select>
             </div>
 
-          <!-- Overlay Timeline Scrubber (mirrors the main timeline below the video) -->
-          <div id="overlayTimelineWrap" class="w-full order-last flex items-center gap-2">
-            <span id="overlayTimeReadout" class="font-mono text-[11px] font-bold text-white/90 w-14 text-left shrink-0 pointer-events-none select-none">00:00.00</span>
-            <div id="overlayTimelineTrack" class="timeline-scrubber relative flex-1 h-4 min-w-[80px] bg-white/20 rounded-md-sm cursor-pointer flex items-center select-none overflow-visible">
-              <div id="overlayTimelineProgress" class="absolute left-0 top-2 bottom-2 bg-md-primary dark:bg-md-dark-primary rounded-l pointer-events-none" style="width: 0%;"></div>
-              <div id="overlayTimelineMarkerRange" class="absolute top-1 bottom-1 bg-md-tertiary/30 dark:bg-md-dark-tertiary/30 border-l border-r border-md-tertiary dark:border-md-dark-tertiary pointer-events-none hidden"></div>
-              <div id="overlayTimelineEventDot" class="absolute top-0 bottom-0 w-2 bg-md-tertiary dark:bg-md-dark-tertiary rounded pointer-events-none hidden transform -translate-x-1/2"></div>
-              <div id="overlayTimelinePlayhead" class="absolute top-0 bottom-0 w-5 -ml-2.5 bg-white dark:bg-md-dark-on-surface border border-md-outline dark:border-md-dark-outline rounded-full shadow-md-2 pointer-events-none" style="left: 0%;"></div>
-              <div id="overlayTimelineTooltip" class="absolute -top-8 transform -translate-x-1/2 bg-md-inverse-surface dark:bg-md-dark-inverse-surface text-md-inverse-on-surface dark:text-md-dark-inverse-on-surface border border-md-outline-variant dark:border-md-dark-outline-variant px-2 py-0.5 rounded-md-xs text-xs font-mono pointer-events-none hidden whitespace-nowrap shadow-md-2 z-30">00:00.00</div>
+            <!-- Overlay Timeline Scrubber (mirrors the main timeline below the video) -->
+            <div id="overlayTimelineWrap" class="w-full flex items-center gap-2 pt-1 mt-1 border-t border-white/15">
+              <span id="overlayTimeReadout" class="font-mono text-[11px] font-bold text-white/90 w-14 text-left shrink-0 pointer-events-none select-none">00:00.00</span>
+              <div id="overlayTimelineTrack" class="timeline-scrubber relative flex-1 h-4 min-w-[80px] bg-white/20 rounded-md-sm cursor-pointer flex items-center select-none overflow-visible">
+                <div id="overlayTimelineProgress" class="absolute left-0 top-2 bottom-2 bg-md-primary dark:bg-md-dark-primary rounded-l pointer-events-none" style="width: 0%;"></div>
+                <div id="overlayTimelineMarkerRange" class="absolute top-1 bottom-1 bg-md-tertiary/30 dark:bg-md-dark-tertiary/30 border-l border-r border-md-tertiary dark:border-md-dark-tertiary pointer-events-none hidden"></div>
+                <div id="overlayTimelineEventDot" class="absolute top-0 bottom-0 w-2 bg-md-tertiary dark:bg-md-dark-tertiary rounded pointer-events-none hidden transform -translate-x-1/2"></div>
+                <div id="overlayTimelinePlayhead" class="absolute top-0 bottom-0 w-5 -ml-2.5 bg-white dark:bg-md-dark-on-surface border border-md-outline dark:border-md-dark-outline rounded-full shadow-md-2 pointer-events-none" style="left: 0%;"></div>
+                <div id="overlayTimelineTooltip" class="absolute -top-8 transform -translate-x-1/2 bg-md-inverse-surface dark:bg-md-dark-inverse-surface text-md-inverse-on-surface dark:text-md-dark-inverse-on-surface border border-md-outline-variant dark:border-md-dark-outline-variant px-2 py-0.5 rounded-md-xs text-xs font-mono pointer-events-none hidden whitespace-nowrap shadow-md-2 z-30">00:00.00</div>
+              </div>
+              <span id="overlayDurationReadout" class="font-mono text-[11px] font-bold text-white/70 w-14 text-right shrink-0 pointer-events-none select-none">00:00.00</span>
             </div>
-            <span id="overlayDurationReadout" class="font-mono text-[11px] font-bold text-white/70 w-14 text-right shrink-0 pointer-events-none select-none">00:00.00</span>
-          </div>
           </div>
         
           <!-- Empty-state / upload overlay stays inside the video frame. -->
@@ -1401,11 +1401,6 @@
             <span class="material-symbols-outlined">picture_in_picture_alt</span>
             <span>PiP</span>
           </button>
-
-<!--           <button type="button" id="qtSpeedBtn" class="quick-toggle-btn" title="Cycle playback speed (0.5x / 1x / 1.5x / 2x)">
-            <span class="material-symbols-outlined">speed</span>
-            <span id="qtSpeedLabel">1.0x</span>
-          </button> -->
 
           <span class="w-px h-5 bg-md-outline-variant dark:bg-md-dark-outline-variant mx-0.5 shrink-0 hidden sm:inline"></span>
 
@@ -1911,12 +1906,15 @@
     const timelineMarkerRange = document.getElementById('timelineMarkerRange');
     const timelineEventDot = document.getElementById('timelineEventDot');
 
+    // Overlay timeline elements (inside the video frame)
     const overlayTimelineTrack = document.getElementById('overlayTimelineTrack');
     const overlayTimelineProgress = document.getElementById('overlayTimelineProgress');
     const overlayTimelinePlayhead = document.getElementById('overlayTimelinePlayhead');
     const overlayTimelineTooltip = document.getElementById('overlayTimelineTooltip');
     const overlayTimelineMarkerRange = document.getElementById('overlayTimelineMarkerRange');
     const overlayTimelineEventDot = document.getElementById('overlayTimelineEventDot');
+    const overlayTimeReadoutEl = document.getElementById('overlayTimeReadout');
+    const overlayDurationReadoutEl = document.getElementById('overlayDurationReadout');
 
     const muteBtn = document.getElementById('muteBtn');
     const muteIcon = document.getElementById('muteIcon');
@@ -4254,12 +4252,17 @@
     function getTrackPercentageFromClientX(clientX) {
       const rect = timelineTrack.getBoundingClientRect();
       const pos = Math.max(0, Math.min(clientX - rect.left, rect.width));
-      return pos / rect.width;
+      return rect.width > 0 ? pos / rect.width : 0;
+    }
+
+    function seekTimelineFromCoord(clientX) {
+      if (!video.duration) return;
+      const pct = getTrackPercentageFromClientX(clientX);
+      video.currentTime = pct * video.duration;
+      updateTimelineUI();
     }
 
     // --- Overlay Timeline Scrubber (inside the video frame) ---
-    const overlayTimeReadoutEl = document.getElementById('overlayTimeReadout');
-    const overlayDurationReadoutEl = document.getElementById('overlayDurationReadout');
     let isOverlayScrubbing = false;
 
     function getOverlayTrackPercentage(clientX) {
@@ -4335,13 +4338,6 @@
     window.addEventListener('touchend', () => {
       isOverlayScrubbing = false;
     });
-
-    function seekTimelineFromCoord(clientX) {
-      if (!video.duration) return;
-      const pct = getTrackPercentageFromClientX(clientX);
-      video.currentTime = pct * video.duration;
-      updateTimelineUI();
-    }
 
     timelineTrack.addEventListener('mousedown', (e) => {
       isScrubbing = true;
