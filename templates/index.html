@@ -914,6 +914,32 @@
         </h4>
         <div id="usersList" class="flex flex-col gap-2 max-h-48 overflow-y-auto"></div>
       </div>
+
+      <!-- Audit Logs Section -->
+      <div class="mt-4 pt-4 border-t border-md-outline-variant dark:border-md-dark-outline-variant">
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="text-sm font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant uppercase tracking-wider flex items-center gap-2">
+            <span class="material-symbols-outlined" style="font-size: 18px;">receipt_long</span>
+            Security & Feature Audit Logs
+          </h4>
+          <div class="flex items-center gap-2">
+            <select id="auditLogFilter" onchange="loadAuditLogs()" class="bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-2 py-1 text-xs text-md-on-surface dark:text-md-dark-on-surface">
+              <option value="ALL">All Types</option>
+              <option value="auth">Auth & Logins</option>
+              <option value="user">User Management</option>
+              <option value="project">Games & Tape</option>
+              <option value="clip">Clips</option>
+              <option value="reel">Reels</option>
+              <option value="roster">Rosters</option>
+              <option value="admin">System & Backups</option>
+            </select>
+            <button type="button" onclick="loadAuditLogs()" class="md-btn-text text-md-primary dark:text-md-dark-primary !p-1 !rounded-full" title="Refresh logs">
+              <span class="material-symbols-outlined" style="font-size: 18px;">refresh</span>
+            </button>
+          </div>
+        </div>
+        <div id="auditLogsContainer" class="flex flex-col gap-1.5 max-h-48 overflow-y-auto font-mono text-xs p-2 bg-md-surface-container dark:bg-md-dark-surface-container rounded-md-sm border border-md-outline-variant dark:border-md-dark-outline-variant"></div>
+      </div>
     </div>
   </div>
 
@@ -2146,6 +2172,7 @@
     const btnOpenUserModal = document.getElementById('btnOpenUserModal');
     btnOpenUserModal.onclick = () => {
       loadUsersList();
+      loadAuditLogs();
       populateProjectAssignmentCheckboxes();
       togglePlayerRoleFields();
       document.getElementById('userModal').classList.remove('hidden');
@@ -2318,6 +2345,42 @@
           </div>
         `;
       }).join('');
+    }
+
+    async function loadAuditLogs() {
+      const container = document.getElementById('auditLogsContainer');
+      if (!container) return;
+      const filter = document.getElementById('auditLogFilter')?.value || "ALL";
+      try {
+        const res = await fetch(`/api/admin/audit-logs?entity_type=${encodeURIComponent(filter)}&limit=100`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const logs = await res.json();
+        if (logs.length === 0) {
+          container.innerHTML = `<span class="text-md-on-surface-variant dark:text-md-dark-on-surface-variant italic py-2">No audit log records found.</span>`;
+          return;
+        }
+        container.innerHTML = logs.map(l => {
+          const dateStr = new Date(l.timestamp * 1000).toLocaleString();
+          const detailsStr = Object.keys(l.details || {}).length > 0 ? JSON.stringify(l.details) : '';
+          const isFailure = l.action.includes('FAILED') || l.action.includes('ERROR');
+          return `
+            <div class="p-1.5 rounded bg-md-surface-container-lowest dark:bg-md-dark-surface-container-lowest border border-md-outline-variant dark:border-md-dark-outline-variant flex flex-col gap-0.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold ${isFailure ? 'text-md-error dark:text-md-dark-error' : 'text-md-primary dark:text-md-dark-primary'}">[${l.action}]</span>
+                <span class="text-[10px] text-md-on-surface-variant dark:text-md-dark-on-surface-variant">${dateStr}</span>
+              </div>
+              <div class="text-[11px] text-md-on-surface dark:text-md-dark-on-surface">
+                <span class="text-md-tertiary dark:text-md-dark-tertiary">${l.actor_username} (${l.actor_role})</span> &bull; <span>${l.entity_type}${l.entity_id ? ` #${l.entity_id}` : ''}</span>
+                ${detailsStr ? `<span class="text-md-on-surface-variant dark:text-md-dark-on-surface-variant ml-1">${detailsStr}</span>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch(err) {
+        console.error("Failed to load audit logs:", err);
+      }
     }
 
     window.deleteUserAccount = async (userId) => {
