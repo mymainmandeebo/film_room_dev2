@@ -1235,17 +1235,23 @@
 
       <!-- Dedicated Player Selection Navigation UI Element -->
       <div id="playerSelectionCard" class="bg-md-surface-container-lowest dark:bg-md-dark-surface-container-lowest border border-md-outline-variant dark:border-md-dark-outline-variant p-5 rounded-md-xl shadow-sm flex flex-col gap-4">
-        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-md-outline-variant dark:border-md-dark-outline-variant">
-          <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-md-primary dark:text-md-dark-primary" style="font-size: 22px;">group</span>
-            <span class="text-sm font-medium text-md-on-surface dark:text-md-dark-on-surface">Select Player</span>
-            <span id="playerSelectCountBadge" class="text-xs font-mono bg-md-secondary-container dark:bg-md-dark-secondary-container text-md-on-secondary-container dark:text-md-dark-on-secondary-container px-2 py-0.5 rounded-full font-medium">0 players</span>
+        <div class="flex flex-col gap-3 pb-3 border-b border-md-outline-variant dark:border-md-dark-outline-variant">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-md-primary dark:text-md-dark-primary" style="font-size: 22px;">group</span>
+              <span class="text-sm font-medium text-md-on-surface dark:text-md-dark-on-surface">Select Player</span>
+              <span id="playerSelectCountBadge" class="text-xs font-mono bg-md-secondary-container dark:bg-md-dark-secondary-container text-md-on-secondary-container dark:text-md-dark-on-secondary-container px-2 py-0.5 rounded-full font-medium">0 players</span>
+            </div>
           </div>
 
-          <div id="playerViewSelectControls" class="flex flex-wrap items-center gap-3">
-            <label class="text-xs font-medium uppercase text-md-on-surface-variant dark:text-md-dark-on-surface-variant">Roster:</label>
-            <select id="profileRosterSelect" onchange="onProfileRosterChanged()" class="bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-3 py-1.5 text-xs font-medium text-md-on-surface dark:text-md-dark-on-surface"></select>
-            <select id="profilePlayerSelect" onchange="onPlayerSelectDropdownChanged()" class="hidden"></select>
+          <div id="playerViewSelectControls" class="flex flex-col sm:flex-row sm:items-center gap-2">
+            <label class="text-xs font-medium uppercase text-md-on-surface-variant dark:text-md-dark-on-surface-variant shrink-0">Step 1 — Roster:</label>
+            <select id="profileRosterSelect" onchange="onProfileRosterChanged()" class="w-full sm:w-auto sm:min-w-[220px] bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-3 py-1.5 text-xs font-medium text-md-on-surface dark:text-md-dark-on-surface"></select>
+          </div>
+
+          <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+            <label class="text-xs font-medium uppercase text-md-on-surface-variant dark:text-md-dark-on-surface-variant shrink-0">Step 2 — Player:</label>
+            <select id="profilePlayerSelect" onchange="onPlayerSelectDropdownChanged()" class="w-full sm:w-auto sm:min-w-[220px] bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-3 py-1.5 text-xs font-medium text-md-on-surface dark:text-md-dark-on-surface"></select>
           </div>
         </div>
 
@@ -5191,9 +5197,22 @@
         fetchPlayerClips(currentUser.player_name);
       } else {
         if (playerSelectionCard) playerSelectionCard.classList.remove('hidden');
+
+        // Preserve an already-chosen roster across view switches; otherwise
+        // default to the first roster (not "All") so the player dropdown
+        // always has a concrete roster to draw from.
         const rosterSelect = document.getElementById('profileRosterSelect');
-        rosterSelect.innerHTML = `<option value="ALL">All Rosters</option>` + 
-          rosters.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
+        const previousRoster = rosterSelect.value;
+        rosterSelect.innerHTML = rosters.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
+
+        if (previousRoster && rosters.some(r => r.name === previousRoster)) {
+          rosterSelect.value = previousRoster;
+        } else if (rosters.length > 0) {
+          rosterSelect.value = rosters[0].name;
+        }
+
+        // New roster → clear out any player carried over from a different roster.
+        selectedProfilePlayer = null;
         onProfileRosterChanged();
       }
     }
@@ -5335,25 +5354,22 @@
     });
 
     function onProfileRosterChanged() {
-      const rosterName = document.getElementById('profileRosterSelect')?.value || "ALL";
+      const rosterSelect = document.getElementById('profileRosterSelect');
+      const rosterName = rosterSelect?.value || (rosters[0] ? rosters[0].name : null);
       const playerSelect = document.getElementById('profilePlayerSelect');
       const chipsContainer = document.getElementById('profilePlayerChipsContainer');
       const countBadge = document.getElementById('playerSelectCountBadge');
-      let playerList = [];
 
-      if (!rosterName || rosterName === "ALL") {
-        const set = new Set();
-        rosters.forEach(r => (r.players || []).forEach(p => {
-          if (p && !p.toLowerCase().includes('unassigned')) set.add(p);
-        }));
-        playerList = Array.from(set);
-      } else {
+      // A specific roster must be chosen; we no longer aggregate across all rosters.
+      let playerList = [];
+      if (rosterName) {
         const r = rosters.find(x => x.name.toLowerCase() === rosterName.toLowerCase());
         playerList = (r ? r.players : []).filter(p => p && !p.toLowerCase().includes('unassigned'));
       }
 
       if (countBadge) countBadge.innerText = `${playerList.length} ${playerList.length === 1 ? 'player' : 'players'}`;
 
+      // Rebuild the player dropdown for the chosen roster only.
       if (playerSelect) {
         playerSelect.innerHTML = `<option value="">-- Choose a Player --</option>` +
           playerList.map(p => `<option value="${p}">${p}</option>`).join('');
@@ -5379,6 +5395,8 @@
         }
       }
 
+      // If the previously selected player belongs to this roster, keep them;
+      // otherwise clear the selection so the user must pick from this roster.
       if (selectedProfilePlayer && playerList.includes(selectedProfilePlayer)) {
         if (playerSelect) playerSelect.value = selectedProfilePlayer;
         updatePlayerAvatarUI(selectedProfilePlayer);
