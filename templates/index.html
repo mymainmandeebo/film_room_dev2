@@ -910,6 +910,17 @@
       </div>
 
       <div>
+        <div class="flex justify-between items-center mb-1">
+          <label class="text-xs font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant">Players Available For This Game</label>
+          <button type="button" id="projPlayersSelectAllBtn" class="text-xs font-medium text-md-primary dark:text-md-dark-primary hover:underline">Select All / Clear</button>
+        </div>
+        <p class="text-[11px] text-md-on-surface-variant dark:text-md-dark-on-surface-variant mb-1.5">Leave all unchecked to use the full roster for player tagging. Down-select to only the players who dressed for this game.</p>
+        <div id="projAvailablePlayersBox" class="flex flex-wrap gap-1 p-2 bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm max-h-32 overflow-y-auto text-xs">
+          <!-- Populated dynamically with player toggle chips -->
+        </div>
+      </div>
+
+      <div>
         <label class="text-xs font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant block mb-1">Description / Scouting Focus</label>
         <textarea id="projDescInput" placeholder="Objectives, key matchups, and focus areas..." class="w-full bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm p-4 text-sm text-md-on-surface dark:text-md-dark-on-surface resize-none" rows="3"></textarea>
       </div>

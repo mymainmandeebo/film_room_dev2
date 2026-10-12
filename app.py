@@ -125,6 +125,8 @@ def read_db():
             data.setdefault("player_photos", {})
             for p in data.get("projects", []):
                 p.setdefault("sport", "Basketball")
+                # None means "no down-selection" -> use full roster for the game.
+                p.setdefault("available_players", None)
             for c in data.get("clips", []):
                 if "categories" not in c and "category" in c:
                     c["categories"] = [c["category"]] if c["category"] else ["General"]
@@ -313,6 +315,7 @@ class ProjectCreatePayload(BaseModel):
     league: Optional[str] = ""
     description: Optional[str] = ""
     roster_name: Optional[str] = "Varsity 2026"
+    available_players: Optional[List[str]] = None
 
 class ProjectUpdatePayload(BaseModel):
     name: str
@@ -322,6 +325,7 @@ class ProjectUpdatePayload(BaseModel):
     league: Optional[str] = ""
     description: Optional[str] = ""
     roster_name: Optional[str] = "Varsity 2026"
+    available_players: Optional[List[str]] = None
 
 @app.get("/api/projects")
 def get_projects(user: dict = Depends(get_current_user)):
@@ -344,6 +348,11 @@ def create_project(payload: ProjectCreatePayload, user: dict = Depends(get_curre
         "league": payload.league,
         "description": payload.description,
         "roster_name": payload.roster_name,
+        "available_players": (
+            [p.strip() for p in payload.available_players if p and p.strip()]
+            if payload.available_players is not None
+            else None
+        ),
         "video_filename": None
     }
     db["projects"].append(new_project)
@@ -368,6 +377,11 @@ def update_project(project_id: str, payload: ProjectUpdatePayload, user: dict = 
     project["league"] = payload.league
     project["description"] = payload.description
     project["roster_name"] = payload.roster_name
+
+    if payload.available_players is not None:
+        cleaned = [p.strip() for p in payload.available_players if p and p.strip()]
+        # Treat an empty list as "no down-selection" so the full roster is used.
+        project["available_players"] = cleaned if cleaned else None
 
     write_db(db)
     return project
