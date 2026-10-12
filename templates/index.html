@@ -523,6 +523,59 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #79747E; border-radius: 4px; }
     .dark ::-webkit-scrollbar-thumb { background: #49454F; }
+
+    /* Video player controls overlay: keep all controls anchored to the video frame. */
+    #videoContainer {
+      position: relative;
+      isolation: isolate;
+    }
+    #videoContainer > #videoPlayer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+    #videoContainer > #telestrationCanvas {
+      z-index: 10;
+    }
+    #videoControlsOverlay {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      z-index: 20;
+      max-width: calc(100% - 24px);
+      box-sizing: border-box;
+    }
+    #videoControlsOverlay button,
+    #videoControlsOverlay input,
+    #videoControlsOverlay select {
+      position: relative;
+      z-index: 1;
+    }
+    #noVideoMsg {
+      z-index: 30;
+    }
+    @media (max-width: 700px) {
+      #videoControlsOverlay {
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+        max-width: calc(100% - 16px);
+        padding: 8px;
+        border-radius: 16px;
+        gap: 6px;
+      }
+      #videoControlsOverlay > div {
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      #videoControlsOverlay #markEventBtn {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+      }
+    }
   </style>
 </head>
 <body class="bg-md-background dark:bg-md-dark-surface text-md-on-background dark:text-md-dark-on-surface min-h-screen flex flex-col font-sans transition-colors duration-200 text-base">
@@ -1263,13 +1316,8 @@
             </div>
           </div>
         
-          <!-- Keep your existing noVideoMsg modal -->
+          <!-- Empty-state / upload overlay stays inside the video frame. -->
           <div id="noVideoMsg" class="absolute inset-0 flex flex-col items-center justify-center text-white/70 bg-black/90 p-6 text-center gap-4 z-30">
-            <!-- ... unchanged content ... -->
-          </div>
-        </div>
-
-          <div id="noVideoMsg" class="absolute inset-0 flex flex-col items-center justify-center text-white/70 bg-black/90 p-6 text-center gap-4">
             <span class="material-symbols-outlined" style="font-size: 64px; opacity: 0.5;">videocam_off</span>
             <p id="noVideoText" class="text-base sm:text-lg font-medium text-white/80">No video uploaded for this specific game project.</p>
             <div id="workspaceUploadActionArea" class="flex flex-col items-center gap-3">
@@ -1365,59 +1413,9 @@
           </div>
         </div>
 
-        <div class="bg-md-surface-container-lowest dark:bg-md-dark-surface-container-lowest border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-lg p-3 flex flex-wrap items-center justify-between gap-2.5 text-sm shadow-sm">
-          <div class="flex items-center gap-1.5">
-            <button id="jumpBackBtn" class="md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant !p-2 !rounded-full" title="Jump back 5s">
-              <span class="material-symbols-outlined" style="font-size: 22px;">replay_5</span>
-            </button>
-            <button id="stepBackBtn" class="md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant !p-2 !rounded-full" title="Step back 1 frame">
-              <span class="material-symbols-outlined" style="font-size: 22px;">skip_previous</span>
-            </button>
-            <button id="playPauseBtn" class="md-btn-filled bg-md-primary dark:bg-md-dark-primary text-md-on-primary dark:text-md-dark-on-primary !py-2.5 !px-6 !text-base !rounded-full min-w-[90px]">
-              <span class="material-symbols-outlined" style="font-size: 22px;">play_arrow</span>
-              Play
-            </button>
-            <button id="stepForwardBtn" class="md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant !p-2 !rounded-full" title="Step forward 1 frame">
-              <span class="material-symbols-outlined" style="font-size: 22px;">skip_next</span>
-            </button>
-            <button id="jumpForwardBtn" class="md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant !p-2 !rounded-full" title="Jump forward 5s">
-              <span class="material-symbols-outlined" style="font-size: 22px;">forward_5</span>
-            </button>
-            <button id="markEventBtn" class="md-btn-filled bg-md-tertiary dark:bg-md-dark-tertiary text-md-on-tertiary dark:text-md-dark-on-tertiary role-editor !py-2.5 !px-5 !text-base shadow-md-1">
-              <span class="material-symbols-outlined filled" style="font-size: 20px;">bolt</span>
-              Mark Event (K)
-            </button>
-          </div>
-
-
-
-          <div class="flex items-center gap-3 ml-auto">
-            <div class="flex items-center gap-2 bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant px-3 py-1.5 rounded-full">
-              <button id="muteBtn" class="text-md-on-surface-variant dark:text-md-dark-on-surface-variant hover:text-md-primary dark:hover:text-md-dark-primary transition !p-1" title="Toggle Mute (Key: M)">
-                <span id="muteIcon" class="material-symbols-outlined" style="font-size: 20px;">volume_up</span>
-              </button>
-              <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1" class="w-16 sm:w-24 md-slider bg-md-surface-container-highest dark:bg-md-dark-surface-container-highest">
-              <span id="volumePct" class="font-mono text-xs text-md-on-surface-variant dark:text-md-dark-on-surface-variant w-8 text-right hidden sm:inline">100%</span>
-            </div>
-
-            <select id="playbackRate" class="bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-full px-3 py-2 text-sm font-medium text-md-on-surface dark:text-md-dark-on-surface min-h-[40px]">
-              <option value="0.25">0.25x</option>
-              <option value="0.5">0.5x</option>
-              <option value="1" selected>1.0x</option>
-              <option value="1.5">1.5x</option>
-              <option value="2.0">2.0x</option>
-            </select>
-            <!-- <button id="telestrationToggle" class="md-btn-filled bg-md-tertiary dark:bg-md-dark-tertiary text-md-on-tertiary dark:text-md-dark-on-tertiary !py-2 !px-3.5 !rounded-full" title="Toggle Drawing Mode">
-              <span class="material-symbols-outlined" style="font-size: 20px;">draw</span>
-            </button> -->
-            <!-- <button id="clearDrawingBtn" class="md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant !py-2 !px-3.5 !rounded-full" title="Clear Drawings">
-              <span class="material-symbols-outlined" style="font-size: 20px;">delete</span>
-            </button> -->
-          </div>
-        </div>
       </div>
 
-      <aside class="w-full lg:col-span-4 bg-md-surface-container-lowest dark:bg-md-dark-surface-container-lowest border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-lg p-4 flex flex-col min-h-[340px] max-h-[55vh] lg:max-h-[calc(100vh-120px)] shadow-sm">
+            <aside class="w-full lg:col-span-4 bg-md-surface-container-lowest dark:bg-md-dark-surface-container-lowest border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-lg p-4 flex flex-col min-h-[340px] max-h-[55vh] lg:max-h-[calc(100vh-120px)] shadow-sm">
         <div class="flex items-center gap-1.5 pb-3 border-b border-md-outline-variant dark:border-md-dark-outline-variant">
           <button id="tabPendingMarksBtn" class="flex-1 md-btn-filled bg-md-tertiary/20 dark:bg-md-dark-tertiary/20 text-md-tertiary dark:text-md-dark-tertiary !py-2.5 !text-sm !rounded-full border border-md-tertiary/30 dark:border-md-dark-tertiary/30 role-editor">
             <span class="material-symbols-outlined" style="font-size: 18px;">pending</span>
