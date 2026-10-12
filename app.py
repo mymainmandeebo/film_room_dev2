@@ -32,9 +32,10 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 CLIPS_DIR = DATA_DIR / "clips"
 REELS_DIR = DATA_DIR / "reels"
 PLAYERS_DIR = DATA_DIR / "players"
+LOGOS_DIR = DATA_DIR / "logos"
 DB_FILE = DATA_DIR / "store.json"
 
-for folder in [UPLOAD_DIR, CLIPS_DIR, REELS_DIR, PLAYERS_DIR]:
+for folder in [UPLOAD_DIR, CLIPS_DIR, REELS_DIR, PLAYERS_DIR, LOGOS_DIR]:
     folder.mkdir(parents=True, exist_ok=True)
 
 security = HTTPBearer()
@@ -43,6 +44,7 @@ app.mount("/media/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="upload
 app.mount("/media/clips", StaticFiles(directory=str(CLIPS_DIR)), name="clips")
 app.mount("/media/reels", StaticFiles(directory=str(REELS_DIR)), name="reels")
 app.mount("/media/players", StaticFiles(directory=str(PLAYERS_DIR)), name="players")
+app.mount("/media/logos", StaticFiles(directory=str(LOGOS_DIR)), name="logos")
 
 def sanitize_for_filename(name: Optional[str], default: str = "Unassigned") -> str:
     if not name or not name.strip():
@@ -82,19 +84,23 @@ def init_db():
             "rosters": [
                 {
                     "name": "Varsity 2026",
-                    "players": ["#23 Jordan", "#33 Pippen", "#91 Rodman", "#4 Kerr", "#9 Harper"]
+                    "players": ["#23 Jordan", "#33 Pippen", "#91 Rodman", "#4 Kerr", "#9 Harper"],
+                    "logo_url": None
                 },
                 {
                     "name": "JV Squad",
-                    "players": ["#2 Curry", "#3 Paul", "#11 Thompson", "#23 Green"]
+                    "players": ["#2 Curry", "#3 Paul", "#11 Thompson", "#23 Green"],
+                    "logo_url": None
                 },
                 {
                     "name": "Varsity Football",
-                    "players": ["#12 Brady", "#87 Gronkowski", "#11 Edelman", "#54 Bruschi"]
+                    "players": ["#12 Brady", "#87 Gronkowski", "#11 Edelman", "#54 Bruschi"],
+                    "logo_url": None
                 },
                 {
                     "name": "Varsity Soccer",
-                    "players": ["#10 Messi", "#7 Ronaldo", "#11 Neymar", "#9 Haaland"]
+                    "players": ["#10 Messi", "#7 Ronaldo", "#11 Neymar", "#9 Haaland"],
+                    "logo_url": None
                 }
             ],
             "clips": [],
@@ -112,6 +118,8 @@ def read_db():
             data = json.load(f)
             data.setdefault("reels", [])
             data.setdefault("rosters", [])
+            for r in data.get("rosters", []):
+                r.setdefault("logo_url", None)
             data.setdefault("player_photos", {})
             for p in data.get("projects", []):
                 p.setdefault("sport", "Basketball")
@@ -403,6 +411,7 @@ def delete_project(project_id: str, user: dict = Depends(get_current_user)):
 class RosterSavePayload(BaseModel):
     name: str
     players: List[str]
+    logo_url: Optional[str] = None
     old_name: Optional[str] = None
 
 @app.get("/api/rosters")
@@ -429,15 +438,56 @@ def save_roster(payload: RosterSavePayload, user: dict = Depends(get_current_use
     if existing:
         existing["name"] = payload.name.strip()
         existing["players"] = clean_players
+        if payload.logo_url is not None:
+            existing["logo_url"] = payload.logo_url
         if payload.old_name and payload.old_name != payload.name.strip():
             for p in db.get("projects", []):
                 if p.get("roster_name") == payload.old_name:
                     p["roster_name"] = payload.name.strip()
     else:
-        rosters.append({"name": payload.name.strip(), "players": clean_players})
+        rosters.append({
+            "name": payload.name.strip(),
+            "players": clean_players,
+            "logo_url": payload.logo_url
+        })
 
     write_db(db)
     return {"status": "saved", "rosters": rosters}
+
+@app.post("/api/rosters/logo")
+async def upload_roster_logo(
+    roster_name: str = Form(...),
+    logo: UploadFile = File(...),
+    user: dict = Depends(get_current_user)
+):
+    if user["role"] in ["viewer", "player"]:
+        raise HTTPException(status_code=403, detail="Permission denied to upload roster logo")
+
+    clean_roster = roster_name.strip()
+    if not clean_roster:
+        raise HTTPException(status_code=400, detail="Roster name required")
+
+    ext = Path(logo.filename or "").suffix.lower()
+    if ext not in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".svg"]:
+        raise HTTPException(status_code=400, detail="Unsupported logo image format")
+
+    content = await logo.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Logo file too large (max 10MB)")
+
+    safe_slug = sanitize_for_filename(clean_roster, default="roster")
+    filename = f"logo_{safe_slug}_{uuid.uuid4().hex[:6]}{ext}"
+    target_path = LOGOS_DIR / filename
+
+    with open(target_path, "wb") as f:
+        f.write(content)
+
+    logo_url = f"/media/logos/{filename}"
+    return {
+        "status": "uploaded",
+        "url": logo_url,
+        "logo_url": logo_url
+    }
 
 @app.delete("/api/rosters/{roster_name}")
 def delete_roster(roster_name: str, user: dict = Depends(get_current_user)):
@@ -448,6 +498,16 @@ def delete_roster(roster_name: str, user: dict = Depends(get_current_user)):
     rosters = db.get("rosters", [])
     if len(rosters) <= 1:
         raise HTTPException(status_code=400, detail="Must keep at least one roster")
+
+    target_roster = next((r for r in rosters if r["name"].lower() == roster_name.lower()), None)
+    if target_roster and target_roster.get("logo_url"):
+        logo_filename = Path(target_roster["logo_url"]).name
+        logo_file = LOGOS_DIR / logo_filename
+        if logo_file.exists():
+            try:
+                logo_file.unlink()
+            except Exception:
+                pass
 
     db["rosters"] = [r for r in rosters if r["name"].lower() != roster_name.lower()]
     write_db(db)
@@ -966,6 +1026,7 @@ def backup_all_data(user: dict = Depends(get_current_user)):
             "clips": CLIPS_DIR,
             "reels": REELS_DIR,
             "players": PLAYERS_DIR,
+            "logos": LOGOS_DIR,
         }
         for arc_prefix, folder in media_dirs.items():
             if not folder.exists():
@@ -1070,6 +1131,7 @@ async def restore_all_data(
             "clips": CLIPS_DIR,
             "reels": REELS_DIR,
             "players": PLAYERS_DIR,
+            "logos": LOGOS_DIR,
         }
         for arc_prefix, folder in media_dirs.items():
             if overwrite:
