@@ -1286,7 +1286,23 @@
             <span id="activeRosterDisplay" class="text-xs font-mono text-md-primary dark:text-md-dark-primary bg-md-primary-container dark:bg-md-dark-primary-container px-2.5 py-1 rounded-full truncate font-medium"></span>
           </div>
         </div>
+        <!-- <div class="bg-md-surface-container-lowest dark:bg-md-dark-surface-container-lowest border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-lg px-4 py-2.5 flex flex-col gap-2 shadow-sm">
+          <div class="flex justify-between items-center text-sm font-mono font-bold">
+            <span id="currentTimeDisplay" class="text-md-primary dark:text-md-dark-primary text-base">00:00.00</span>
+            <div class="flex items-center gap-4">
+              <span class="text-xs text-md-on-surface-variant dark:text-md-dark-on-surface-variant hidden sm:inline font-sans">Hotkeys: <kbd class="bg-md-surface-container-high dark:bg-md-dark-surface-container-high px-1.5 py-0.5 rounded text-md-tertiary dark:text-md-dark-tertiary font-mono font-bold text-xs">K</kbd> Mark • <kbd class="bg-md-surface-container-high dark:bg-md-dark-surface-container-high px-1.5 py-0.5 rounded text-md-primary dark:text-md-dark-primary font-mono font-bold text-xs">1-9</kbd> Toggle Tags</span>
+              <span id="durationDisplay" class="text-md-on-surface-variant dark:text-md-dark-on-surface-variant">00:00.00</span>
+            </div>
+          </div>
 
+          <div id="timelineTrack" class="timeline-scrubber relative w-full h-4 bg-md-surface-container-high dark:bg-md-dark-surface-container-high rounded-md-sm cursor-pointer flex items-center select-none overflow-visible">
+            <div id="timelineProgress" class="absolute left-0 top-2 bottom-2 bg-md-primary/60 dark:bg-md-dark-primary/60 rounded-l pointer-events-none" style="width: 0%;"></div>
+            <div id="timelineMarkerRange" class="absolute top-1 bottom-1 bg-md-tertiary/25 dark:bg-md-dark-tertiary/25 border-l border-r border-md-tertiary dark:border-md-dark-tertiary pointer-events-none hidden"></div>
+            <div id="timelineEventDot" class="absolute top-0 bottom-0 w-2 bg-md-tertiary dark:bg-md-dark-tertiary rounded pointer-events-none hidden transform -translate-x-1/2"></div>
+            <div id="timelinePlayhead" class="absolute top-0 bottom-0 w-6 -ml-3 bg-white dark:bg-md-dark-on-surface border border-md-outline dark:border-md-dark-outline rounded-full shadow-md-2 pointer-events-none" style="left: 0%;"></div>
+            <div id="timelineTooltip" class="absolute -top-8 transform -translate-x-1/2 bg-md-inverse-surface dark:bg-md-dark-inverse-surface text-md-inverse-on-surface dark:text-md-dark-inverse-on-surface border border-md-outline-variant dark:border-md-dark-outline-variant px-2 py-0.5 rounded-md-xs text-xs font-mono pointer-events-none hidden whitespace-nowrap shadow-md-2 z-20">00:00.00</div>
+          </div>
+        </div> -->
         <div id="videoContainer" class="group relative bg-black rounded-md-lg overflow-hidden border border-md-outline-variant dark:border-md-dark-outline-variant flex items-center justify-center w-full aspect-video max-h-[50vh] lg:max-h-[540px] shadow-sm">
           <video id="videoPlayer" playsinline webkit-playsinline class="w-full h-full object-contain"></video>
           <canvas id="telestrationCanvas" class="absolute top-0 left-0 w-full h-full z-10"></canvas>
@@ -1424,23 +1440,7 @@
           <div id="playTypeQuickToggles" class="flex flex-wrap items-center gap-1.5"></div>
         </div>
 
-        <div class="bg-md-surface-container-lowest dark:bg-md-dark-surface-container-lowest border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-lg px-4 py-2.5 flex flex-col gap-2 shadow-sm">
-          <div class="flex justify-between items-center text-sm font-mono font-bold">
-            <span id="currentTimeDisplay" class="text-md-primary dark:text-md-dark-primary text-base">00:00.00</span>
-            <div class="flex items-center gap-4">
-              <span class="text-xs text-md-on-surface-variant dark:text-md-dark-on-surface-variant hidden sm:inline font-sans">Hotkeys: <kbd class="bg-md-surface-container-high dark:bg-md-dark-surface-container-high px-1.5 py-0.5 rounded text-md-tertiary dark:text-md-dark-tertiary font-mono font-bold text-xs">K</kbd> Mark • <kbd class="bg-md-surface-container-high dark:bg-md-dark-surface-container-high px-1.5 py-0.5 rounded text-md-primary dark:text-md-dark-primary font-mono font-bold text-xs">1-9</kbd> Toggle Tags</span>
-              <span id="durationDisplay" class="text-md-on-surface-variant dark:text-md-dark-on-surface-variant">00:00.00</span>
-            </div>
-          </div>
 
-          <div id="timelineTrack" class="timeline-scrubber relative w-full h-4 bg-md-surface-container-high dark:bg-md-dark-surface-container-high rounded-md-sm cursor-pointer flex items-center select-none overflow-visible">
-            <div id="timelineProgress" class="absolute left-0 top-2 bottom-2 bg-md-primary/60 dark:bg-md-dark-primary/60 rounded-l pointer-events-none" style="width: 0%;"></div>
-            <div id="timelineMarkerRange" class="absolute top-1 bottom-1 bg-md-tertiary/25 dark:bg-md-dark-tertiary/25 border-l border-r border-md-tertiary dark:border-md-dark-tertiary pointer-events-none hidden"></div>
-            <div id="timelineEventDot" class="absolute top-0 bottom-0 w-2 bg-md-tertiary dark:bg-md-dark-tertiary rounded pointer-events-none hidden transform -translate-x-1/2"></div>
-            <div id="timelinePlayhead" class="absolute top-0 bottom-0 w-6 -ml-3 bg-white dark:bg-md-dark-on-surface border border-md-outline dark:border-md-dark-outline rounded-full shadow-md-2 pointer-events-none" style="left: 0%;"></div>
-            <div id="timelineTooltip" class="absolute -top-8 transform -translate-x-1/2 bg-md-inverse-surface dark:bg-md-dark-inverse-surface text-md-inverse-on-surface dark:text-md-dark-inverse-on-surface border border-md-outline-variant dark:border-md-dark-outline-variant px-2 py-0.5 rounded-md-xs text-xs font-mono pointer-events-none hidden whitespace-nowrap shadow-md-2 z-20">00:00.00</div>
-          </div>
-        </div>
 
       </div>
 
