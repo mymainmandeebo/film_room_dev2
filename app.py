@@ -31,11 +31,12 @@ DATA_DIR = BASE_DIR / "data"
 UPLOAD_DIR = DATA_DIR / "uploads"
 CLIPS_DIR = DATA_DIR / "clips"
 REELS_DIR = DATA_DIR / "reels"
+THUMBS_DIR = DATA_DIR / "thumbnails"
 PLAYERS_DIR = DATA_DIR / "players"
 LOGOS_DIR = DATA_DIR / "logos"
 DB_FILE = DATA_DIR / "store.json"
 
-for folder in [UPLOAD_DIR, CLIPS_DIR, REELS_DIR, PLAYERS_DIR, LOGOS_DIR]:
+for folder in [UPLOAD_DIR, CLIPS_DIR, REELS_DIR, THUMBS_DIR, PLAYERS_DIR, LOGOS_DIR]:
     folder.mkdir(parents=True, exist_ok=True)
 
 security = HTTPBearer()
@@ -43,6 +44,7 @@ security = HTTPBearer()
 app.mount("/media/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 app.mount("/media/clips", StaticFiles(directory=str(CLIPS_DIR)), name="clips")
 app.mount("/media/reels", StaticFiles(directory=str(REELS_DIR)), name="reels")
+app.mount("/media/thumbnails", StaticFiles(directory=str(THUMBS_DIR)), name="thumbnails")
 app.mount("/media/players", StaticFiles(directory=str(PLAYERS_DIR)), name="players")
 app.mount("/media/logos", StaticFiles(directory=str(LOGOS_DIR)), name="logos")
 
@@ -562,6 +564,21 @@ async def upload_video_chunk(
 
         project["video_filename"] = safe_filename
         project["video_original_name"] = original_filename
+
+        # Generate 16:9 poster thumbnail frame at 5.0s for dashboard preview
+        thumb_filename = f"thumb_{project_id}.jpg"
+        thumb_path = THUMBS_DIR / thumb_filename
+        cmd_thumb = [
+            "ffmpeg", "-y",
+            "-ss", "00:00:05",
+            "-i", str(target_path),
+            "-vframes", "1",
+            "-vf", "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2",
+            str(thumb_path)
+        ]
+        subprocess.run(cmd_thumb, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        project["thumbnail_url"] = f"/media/thumbnails/{thumb_filename}"
+
         write_db(db)
         return {
             "status": "complete",
