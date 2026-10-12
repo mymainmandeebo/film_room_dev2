@@ -589,6 +589,9 @@
         margin-top: 2px;
       }
     }
+    /* Keep the legacy main timeline hooks available for playback logic, but show only the overlay scrubber. */
+    #timelineTrack { display: none !important; }
+
     /* Overlay timeline scrubber — mirrors the main timelineTrack styling */
     #overlayTimelineTrack {
       user-select: none;
