@@ -7,11 +7,12 @@ import zipfile
 import io
 import time
 import shutil
+import asyncio
 from pathlib import Path
 from typing import List, Optional, Union
 import bcrypt
 import jwt
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Depends
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Depends, BackgroundTasks
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
@@ -33,9 +34,10 @@ CLIPS_DIR = DATA_DIR / "clips"
 REELS_DIR = DATA_DIR / "reels"
 PLAYERS_DIR = DATA_DIR / "players"
 LOGOS_DIR = DATA_DIR / "logos"
+BACKUP_DIR = DATA_DIR / "backups"
 DB_FILE = DATA_DIR / "store.json"
 
-for folder in [UPLOAD_DIR, CLIPS_DIR, REELS_DIR, PLAYERS_DIR, LOGOS_DIR]:
+for folder in [UPLOAD_DIR, CLIPS_DIR, REELS_DIR, PLAYERS_DIR, LOGOS_DIR, BACKUP_DIR]:
     folder.mkdir(parents=True, exist_ok=True)
 
 security = HTTPBearer()
@@ -105,7 +107,8 @@ def init_db():
             ],
             "clips": [],
             "reels": [],
-            "player_photos": {}
+            "player_photos": {},
+            "settings": {"daily_backup_enabled": False, "last_backup_at": None}
         }
         with open(DB_FILE, "w") as f:
             json.dump(default_data, f, indent=2)
@@ -121,6 +124,9 @@ def read_db():
             for r in data.get("rosters", []):
                 r.setdefault("logo_url", None)
             data.setdefault("player_photos", {})
+            data.setdefault("settings", {"daily_backup_enabled": False, "last_backup_at": None})
+            data["settings"].setdefault("daily_backup_enabled", False)
+            data["settings"].setdefault("last_backup_at", None)
             for p in data.get("projects", []):
                 p.setdefault("sport", "Basketball")
             for c in data.get("clips", []):
@@ -133,6 +139,110 @@ def read_db():
             return data
     except Exception:
         return {"users": [], "projects": [], "clips": [], "reels": [], "rosters": [], "player_photos": {}}
+
+def create_local_backup() -> Path:
+    """Create a timestamped ZIP backup of the store + media directories on disk."""
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    zip_filename = f"film_room_backup_{APP_ENV_LABEL.lower()}_{stamp}.zip"
+    zip_path = BACKUP_DIR / zip_filename
+    counter = 1
+    while zip_path.exists():
+        zip_path = BACKUP_DIR / f"film_room_backup_{APP_ENV_LABEL.lower()}_{stamp}_{counter}.zip"
+        counter += 1
+
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        if DB_FILE.exists():
+            zf.write(DB_FILE, arcname="store.json")
+
+        # Full-length game tapes in data/uploads are intentionally excluded
+        # (they are large). Clips, reels, player photos and logos are included.
+        media_dirs = {
+            "clips": CLIPS_DIR,
+            "reels": REELS_DIR,
+            "players": PLAYERS_DIR,
+            "logos": LOGOS_DIR,
+        }
+        for arc_prefix, folder in media_dirs.items():
+            if not folder.exists():
+                continue
+            for file_path in folder.rglob("*"):
+                if file_path.is_file():
+                    rel = file_path.relative_to(folder)
+                    zf.write(file_path, arcname=f"media/{arc_prefix}/{rel.as_posix()}")
+
+        db = read_db()
+        manifest = {
+            "app": "sports-film-room",
+            "env": APP_ENV,
+            "exported_at": int(time.time()),
+            "auto_backup": True,
+            "counts": {
+                "users": len(db.get("users", [])),
+                "projects": len(db.get("projects", [])),
+                "clips": len(db.get("clips", [])),
+                "reels": len(db.get("reels", [])),
+                "rosters": len(db.get("rosters", [])),
+                "player_photos": len(db.get("player_photos", {})),
+            }
+        }
+        zf.writestr("manifest.json", json.dumps(manifest, indent=2))
+
+    return zip_path
+
+
+def prune_old_backups(keep: int = 7) -> int:
+    """Keep only the N most recent backup ZIPs. Returns number deleted."""
+    if not BACKUP_DIR.exists():
+        return 0
+    backups = sorted(
+        BACKUP_DIR.glob("film_room_backup_*.zip"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    deleted = 0
+    for old in backups[keep:]:
+        try:
+            old.unlink()
+            deleted += 1
+        except Exception as e:
+            print(f"[backup] Failed to prune {old}: {e}")
+    return deleted
+
+
+def run_backup_job():
+    """Blocking backup job used by BackgroundTasks and the scheduler."""
+    try:
+        zip_path = create_local_backup()
+        prune_old_backups(7)
+        db = read_db()
+        db.setdefault("settings", {})["last_backup_at"] = int(time.time())
+        write_db(db)
+        print(f"[backup] Wrote {zip_path.name} ({zip_path.stat().st_size} bytes)")
+    except Exception as e:
+        print(f"[backup] Job error: {e}")
+
+
+async def daily_backup_scheduler():
+    """Checks every hour whether a daily backup is due, runs one if so."""
+    await asyncio.sleep(5)  # let the app finish booting
+    while True:
+        try:
+            db = read_db()
+            settings = db.get("settings", {})
+            if settings.get("daily_backup_enabled"):
+                last = settings.get("last_backup_at")
+                now = int(time.time())
+                if last is None or (now - last) >= 24 * 3600:
+                    print("[backup] Running scheduled daily backup...")
+                    await asyncio.to_thread(run_backup_job)
+        except Exception as e:
+            print(f"[backup] Scheduler error: {e}")
+        await asyncio.sleep(3600)
+
+
+@app.on_event("startup")
+async def _start_daily_backup_scheduler():
+    asyncio.create_task(daily_backup_scheduler())
 
 def write_db(data):
     with open(DB_FILE, "w") as f:
@@ -1256,6 +1366,114 @@ def export_reel_concatenated_video(reel_id: str, user: dict = Depends(get_curren
         },
         background=BackgroundTask(cleanup_temp_files, output_video_path)
     )
+
+# --- Automatic Local Backup Settings (Admin Only) ---
+class BackupSettingsPayload(BaseModel):
+    daily_backup_enabled: bool
+
+
+@app.get("/api/admin/settings")
+def get_admin_settings(user: dict = Depends(get_current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+    db = read_db()
+    settings = db.get("settings", {})
+
+    backups = sorted(
+        BACKUP_DIR.glob("film_room_backup_*.zip"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    backup_list = [
+        {
+            "filename": p.name,
+            "size": p.stat().st_size,
+            "created_at": int(p.stat().st_mtime),
+        }
+        for p in backups
+    ]
+
+    return {
+        "daily_backup_enabled": bool(settings.get("daily_backup_enabled", False)),
+        "last_backup_at": settings.get("last_backup_at"),
+        "backup_count": len(backup_list),
+        "backups": backup_list,
+    }
+
+
+@app.put("/api/admin/settings")
+def update_admin_settings(
+    payload: BackupSettingsPayload,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(get_current_user),
+):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+    db = read_db()
+    settings = db.setdefault("settings", {})
+    was_enabled = bool(settings.get("daily_backup_enabled", False))
+    settings["daily_backup_enabled"] = payload.daily_backup_enabled
+    write_db(db)
+
+    # First-time enable → kick off a backup immediately if none in the last 24h.
+    if payload.daily_backup_enabled and not was_enabled:
+        last = settings.get("last_backup_at")
+        now = int(time.time())
+        if last is None or (now - last) >= 24 * 3600:
+            background_tasks.add_task(run_backup_job)
+
+    return {"status": "saved", "daily_backup_enabled": payload.daily_backup_enabled}
+
+
+@app.post("/api/admin/backup/run-now")
+def run_backup_now(user: dict = Depends(get_current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+
+    zip_path = create_local_backup()
+    prune_old_backups(7)
+
+    db = read_db()
+    db.setdefault("settings", {})["last_backup_at"] = int(time.time())
+    write_db(db)
+
+    return {
+        "status": "created",
+        "filename": zip_path.name,
+        "size": zip_path.stat().st_size,
+    }
+
+
+@app.get("/api/admin/backups/{filename}")
+def download_local_backup(filename: str, user: dict = Depends(get_current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+    safe_name = Path(filename).name
+    target = BACKUP_DIR / safe_name
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="Backup not found")
+    return FileResponse(
+        path=str(target),
+        media_type="application/zip",
+        filename=safe_name,
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
+    )
+
+
+@app.delete("/api/admin/backups/{filename}")
+def delete_local_backup(filename: str, user: dict = Depends(get_current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+    safe_name = Path(filename).name
+    target = BACKUP_DIR / safe_name
+    if not target.exists():
+        raise HTTPException(status_code=404, detail="Backup not found")
+    try:
+        target.unlink()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not delete backup: {e}")
+    return {"status": "deleted", "filename": safe_name}
+
 
 @app.get("/api/projects/{project_id}/export-zip")
 def export_project_clips_zip(project_id: str, category: Optional[str] = None, user: dict = Depends(get_current_user)):

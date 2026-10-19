@@ -1152,6 +1152,44 @@
             <div id="backupProgressBar" class="h-full bg-md-primary dark:bg-md-dark-primary rounded-full transition-all duration-150" style="width: 0%;"></div>
           </div>
         </div>
+
+        <!-- Automatic Daily Local Backup -->
+        <div class="mt-4 pt-4 border-t border-md-outline-variant dark:border-md-dark-outline-variant">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <h5 class="text-sm font-medium text-md-on-surface dark:text-md-dark-on-surface flex items-center gap-1.5">
+                <span class="material-symbols-outlined" style="font-size: 16px;">schedule</span>
+                Automatic Daily Local Backup
+              </h5>
+              <p class="text-xs text-md-on-surface-variant dark:text-md-dark-on-surface-variant mt-0.5">
+                Every 24 hours the server writes a ZIP containing
+                <code class="font-mono text-[11px] bg-md-surface-container-high dark:bg-md-dark-surface-container-high px-1 py-0.5 rounded">store.json</code>
+                and the <code class="font-mono text-[11px] bg-md-surface-container-high dark:bg-md-dark-surface-container-high px-1 py-0.5 rounded">clips/</code>,
+                <code class="font-mono text-[11px] bg-md-surface-container-high dark:bg-md-dark-surface-container-high px-1 py-0.5 rounded">reels/</code>,
+                <code class="font-mono text-[11px] bg-md-surface-container-high dark:bg-md-dark-surface-container-high px-1 py-0.5 rounded">players/</code> and
+                <code class="font-mono text-[11px] bg-md-surface-container-high dark:bg-md-dark-surface-container-high px-1 py-0.5 rounded">logos/</code>
+                folders to <code class="font-mono text-[11px] bg-md-surface-container-high dark:bg-md-dark-surface-container-high px-1 py-0.5 rounded">data/backups/</code>.
+                Keeps the 7 most recent backups. Full game tapes are excluded to keep backups lightweight.
+              </p>
+            </div>
+            <label class="md-switch shrink-0 mt-0.5">
+              <input type="checkbox" id="dailyBackupToggle" class="peer">
+              <span class="md-switch-slider bg-md-surface-container-highest dark:bg-md-dark-surface-container-highest peer-checked:bg-md-primary dark:peer-checked:bg-md-dark-primary"></span>
+            </label>
+          </div>
+
+          <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <button id="runBackupNowBtn" class="md-btn-outlined border-md-primary dark:border-md-dark-primary text-md-primary dark:text-md-dark-primary !py-2 !px-3 !text-xs">
+              <span class="material-symbols-outlined" style="font-size: 16px;">backup</span>
+              Backup Now
+            </button>
+            <span id="backupSummaryText" class="text-xs text-md-on-surface-variant dark:text-md-dark-on-surface-variant font-mono">—</span>
+          </div>
+
+          <div id="localBackupsList" class="mt-3 flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+            <span class="text-xs text-md-on-surface-variant dark:text-md-dark-on-surface-variant italic">Loading backups...</span>
+          </div>
+        </div>
       </div>
 
       <!-- Action Buttons -->
@@ -3816,6 +3854,7 @@
       if (backupSection) {
         if (currentUser && currentUser.role === 'admin') {
           backupSection.classList.remove('hidden');
+          loadAdminBackupSettings();
         } else {
           backupSection.classList.add('hidden');
         }
@@ -3823,6 +3862,151 @@
       document.getElementById('settingsModal').classList.remove('hidden');
     };
     document.getElementById('closeSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.add('hidden');
+
+    // --- Automatic Daily Local Backup Controls (Admin) ---
+    async function loadAdminBackupSettings() {
+      if (!currentUser || currentUser.role !== 'admin') return;
+      try {
+        const res = await fetch('/api/admin/settings', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const toggle = document.getElementById('dailyBackupToggle');
+        if (toggle) toggle.checked = !!data.daily_backup_enabled;
+
+        const summary = document.getElementById('backupSummaryText');
+        if (summary) {
+          const last = data.last_backup_at ? new Date(data.last_backup_at * 1000) : null;
+          const count = data.backup_count || 0;
+          const countLabel = `${count} backup${count === 1 ? '' : 's'}`;
+          summary.innerText = last
+            ? `Last: ${last.toLocaleString()} • ${countLabel}`
+            : `No backups yet • ${countLabel}`;
+        }
+
+        renderLocalBackupsList(data.backups || []);
+      } catch (err) {
+        console.error('Failed to load admin backup settings:', err);
+      }
+    }
+
+    function renderLocalBackupsList(backups) {
+      const container = document.getElementById('localBackupsList');
+      if (!container) return;
+
+      if (!backups || backups.length === 0) {
+        container.innerHTML = `<span class="text-xs text-md-on-surface-variant dark:text-md-dark-on-surface-variant italic">No local backups yet. Enable automatic backups or click "Backup Now".</span>`;
+        return;
+      }
+
+      container.innerHTML = backups.map(b => {
+        const sizeMB = (b.size / (1024 * 1024)).toFixed(2);
+        const date = new Date(b.created_at * 1000).toLocaleString();
+        const safe = (b.filename || '').replace(/"/g, '&quot;');
+        return `
+          <div class="flex items-center justify-between gap-2 bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-2.5 py-1.5">
+            <div class="overflow-hidden min-w-0">
+              <div class="text-[11px] font-mono text-md-on-surface dark:text-md-dark-on-surface truncate" title="${safe}">${safe}</div>
+              <div class="text-[10px] text-md-on-surface-variant dark:text-md-dark-on-surface-variant">${date} • ${sizeMB} MB</div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button onclick="downloadLocalBackup('${safe}')" class="md-btn-text text-md-primary dark:text-md-dark-primary !p-1.5 !rounded-full" title="Download">
+                <span class="material-symbols-outlined" style="font-size: 16px;">download</span>
+              </button>
+              <button onclick="deleteLocalBackup('${safe}')" class="md-btn-text text-md-error dark:text-md-dark-error !p-1.5 !rounded-full" title="Delete">
+                <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function downloadLocalBackup(filename) {
+      try {
+        const res = await fetch(`/api/admin/backups/${encodeURIComponent(filename)}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error("Download failed");
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deleteLocalBackup(filename) {
+      if (!confirm(`Delete backup "${filename}"?`)) return;
+      try {
+        const res = await fetch(`/api/admin/backups/${encodeURIComponent(filename)}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error("Delete failed");
+        loadAdminBackupSettings();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    document.getElementById('dailyBackupToggle')?.addEventListener('change', async (e) => {
+      const desired = e.target.checked;
+      try {
+        const res = await fetch('/api/admin/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ daily_backup_enabled: desired })
+        });
+        if (!res.ok) {
+          e.target.checked = !desired;
+          throw new Error("Failed to save backup setting");
+        }
+        showExportToast(
+          desired ? "Automatic Backup Enabled" : "Automatic Backup Disabled",
+          desired ? "A daily ZIP will be written to data/backups/ every 24h." : "Daily automatic backups have been stopped.",
+          false
+        );
+        setTimeout(hideExportToast, 2500);
+        loadAdminBackupSettings();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    document.getElementById('runBackupNowBtn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('runBackupNowBtn');
+      if (!btn) return;
+      const original = btn.innerHTML;
+      btn.disabled = true;
+      btn.classList.add('opacity-60', 'cursor-wait');
+      btn.innerHTML = `<span class="material-symbols-outlined animate-spin" style="font-size: 16px;">progress_activity</span> Creating...`;
+      try {
+        const res = await fetch('/api/admin/backup/run-now', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error("Backup failed");
+        await loadAdminBackupSettings();
+        showExportToast("Backup Created", "Local backup ZIP written to data/backups/.", false);
+        setTimeout(hideExportToast, 2500);
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('opacity-60', 'cursor-wait');
+        btn.innerHTML = original;
+      }
+    });
+
     document.getElementById('saveSettingsBtn').onclick = () => {
       lookbackSeconds = Math.max(1, parseFloat(document.getElementById('lookbackInput').value) || 10);
       leadoutSeconds = Math.max(0, parseFloat(document.getElementById('leadoutInput').value) || 3);
