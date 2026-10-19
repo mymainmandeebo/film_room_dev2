@@ -411,6 +411,12 @@
       user-select: none; 
       touch-action: none;
     }
+    /* Theater mode clip info overlay badge */
+    #theaterClipOverlayInfo {
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
     .safe-top { padding-top: env(safe-area-inset-top); }
     .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
     .drag-over { border: 2px dashed #6750A4 !important; background-color: rgba(103, 80, 164, 0.1) !important; }
@@ -713,6 +719,14 @@
 
     <div class="relative flex-1 flex items-center justify-center overflow-hidden">
       <video id="theaterVideo" playsinline class="w-full h-full object-contain"></video>
+
+      <!-- Floating overlay for play type and player name during clip review -->
+      <div id="theaterClipOverlayInfo" class="absolute top-6 left-6 bg-black/60 border border-white/20 px-4 py-2.5 rounded-md-lg text-white pointer-events-none transition-opacity duration-300 opacity-0 z-20 flex flex-col gap-1 shadow-lg">
+        <div id="theaterOverlayPlayType" class="text-xs font-mono font-bold uppercase tracking-wider text-md-primary dark:text-md-dark-primary">Play Type</div>
+        <div id="theaterOverlayPlayerName" class="text-sm font-semibold tracking-wide">Player Name</div>
+        <div id="theaterOverlayAnnotation" class="text-xs text-white/80 italic hidden"></div>
+      </div>
+
       <div id="theaterTransitionCard" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3 text-center transition-opacity duration-300 opacity-0 pointer-events-none p-4">
         <span class="text-sm font-mono uppercase tracking-widest text-white/50" id="theaterNextUpText">Next Play</span>
         <h1 class="text-3xl sm:text-5xl font-black text-md-tertiary dark:text-md-dark-tertiary" id="theaterNextPlayInfo">Play Tape</h1>
@@ -3071,6 +3085,24 @@
       const playerList = (clip.players || [clip.player]).join(', ');
       const annotText = clip.annotation ? ` • "${clip.annotation}"` : '';
 
+      // Populate and show the floating theater review overlay badge
+      const overlayInfoEl = document.getElementById('theaterClipOverlayInfo');
+      const overlayPlayTypeEl = document.getElementById('theaterOverlayPlayType');
+      const overlayPlayerEl = document.getElementById('theaterOverlayPlayerName');
+      const overlayAnnotEl = document.getElementById('theaterOverlayAnnotation');
+
+      if (overlayPlayTypeEl) overlayPlayTypeEl.innerText = tagList;
+      if (overlayPlayerEl) overlayPlayerEl.innerText = playerList;
+      if (overlayAnnotEl) {
+        if (clip.annotation) {
+          overlayAnnotEl.innerText = `"${clip.annotation}"`;
+          overlayAnnotEl.classList.remove('hidden');
+        } else {
+          overlayAnnotEl.classList.add('hidden');
+        }
+      }
+      if (overlayInfoEl) overlayInfoEl.style.opacity = '1';
+
       document.getElementById('theaterIndexBadge').innerText = `Play ${idx + 1} / ${theaterClips.length}`;
       document.getElementById('theaterClipInfo').innerText = `${playerList} • ${tagList}${annotText} (${clip.duration}s)`;
 
@@ -3128,6 +3160,9 @@
     function exitTheaterMode() {
       clearTimeout(theaterTransitionTimer);
       theaterVideo.pause();
+      const overlayInfoEl = document.getElementById('theaterClipOverlayInfo');
+      if (overlayInfoEl) overlayInfoEl.style.opacity = '0';
+
       theaterVideo.removeAttribute('src');
       document.getElementById('theaterModal').classList.add('hidden');
     }
