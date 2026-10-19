@@ -373,6 +373,11 @@
       }
     }
 
+    document.getElementById('tabProjectsBtn').onclick = () => switchView('projects');
+    document.getElementById('tabWorkspaceBtn').onclick = () => {
+      if (currentProjectId) switchView('workspace');
+    };
+
     // --- AUTHENTICATION ---
     async function checkAuth() {
       if (!token) {
@@ -623,10 +628,30 @@
     if (overlayTimelineTrack) {
       overlayTimelineTrack.addEventListener('mousedown', (e) => {
         isOverlayScrubbing = true;
-        const rect = overlayTimelineTrack.getBoundingClientRect();
-        video.currentTime = ((e.clientX - rect.left) / rect.width) * video.duration;
+        updateScrubber(e.clientX);
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (!isOverlayScrubbing) return;
+        updateScrubber(e.clientX);
       });
       window.addEventListener('mouseup', () => { isOverlayScrubbing = false; });
+
+      overlayTimelineTrack.addEventListener('touchstart', (e) => {
+        isOverlayScrubbing = true;
+        if (e.touches[0]) updateScrubber(e.touches[0].clientX);
+      });
+      window.addEventListener('touchmove', (e) => {
+        if (!isOverlayScrubbing || !e.touches[0]) return;
+        updateScrubber(e.touches[0].clientX);
+      });
+      window.addEventListener('touchend', () => { isOverlayScrubbing = false; });
+    }
+
+    function updateScrubber(clientX) {
+      if (!video.duration) return;
+      const rect = overlayTimelineTrack.getBoundingClientRect();
+      const pos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      video.currentTime = pos * video.duration;
     }
 
     function toggleMute() {
@@ -677,7 +702,7 @@
               <p class="text-[11px] text-white mt-0.5">${(c.categories || []).join(', ')}</p>
             </div>
             <div class="flex items-center gap-1.5">
-              <button onclick="video.src='${c.url}'; video.play()" class="md-btn-filled bg-md-primary text-white !py-1 !px-2.5">Play</button>
+              <button onclick="video.src='${c.url}'; video.load(); video.play()" class="md-btn-filled bg-md-primary text-white !py-1 !px-2.5">Play</button>
               <button onclick="deleteClip('${c.id}')" class="text-neutral-500 hover:text-red-400 p-1"><span class="material-symbols-outlined" style="font-size: 16px;">delete</span></button>
             </div>
           </div>
@@ -729,8 +754,27 @@
     function openProjectModal(id) {
       editingProjectId = id;
       document.getElementById('projectModalTitle').innerText = id ? 'Edit Game' : 'New Game';
+      if (id) {
+        const p = projects.find(proj => proj.id === id);
+        if (p) {
+          document.getElementById('projNameInput').value = p.name || '';
+          document.getElementById('projOpponentInput').value = p.opponent || '';
+          document.getElementById('projDateInput').value = p.game_date || '';
+          document.getElementById('projSportSelect').value = p.sport || 'Basketball';
+          document.getElementById('projRosterSelect').value = p.roster_name || rosters[0]?.name || '';
+          document.getElementById('projDescInput').value = p.description || '';
+        }
+      } else {
+        document.getElementById('projNameInput').value = '';
+        document.getElementById('projOpponentInput').value = '';
+        document.getElementById('projDateInput').value = new Date().toISOString().split('T')[0];
+        document.getElementById('projSportSelect').value = 'Basketball';
+        document.getElementById('projRosterSelect').value = rosters[0]?.name || '';
+        document.getElementById('projDescInput').value = '';
+      }
       document.getElementById('projectModal').classList.remove('hidden');
     }
+
 
     async function saveProject() {
       const payload = {
