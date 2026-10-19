@@ -4805,7 +4805,7 @@
       const eTime = Math.min(video.duration, evTime + leadout);
       const players = getCurrentRosterPlayers();
 
-      const initialCategories = explicitCategory ? [explicitCategory] : [categories[0] || "Turnover"];
+      const initialCategories = explicitCategory ? [explicitCategory] : [];
       const initialPlayers = [players[0] || "Unassigned / Team Play"];
 
       const newMark = {
