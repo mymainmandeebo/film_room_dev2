@@ -3147,11 +3147,7 @@
       if (!cat) return;
       if (currentUser && (currentUser.role === 'viewer' || currentUser.role === 'player')) return;
 
-      if (activePendingId && pendingMarks.some(m => m.id === activePendingId)) {
-        toggleTagOnMark(activePendingId, cat);
-      } else {
-        addPendingMark(cat);
-      }
+      addPendingMark(cat);
       syncPlayTypeQuickToggleState();
     };
 
@@ -5769,11 +5765,7 @@
       if (['1','2','3','4','5','6','7','8','9'].includes(e.key)) {
         const targetCategory = hotkeyMap[e.key];
         if (targetCategory) {
-          if (activePendingId && pendingMarks.length > 0) {
-            toggleTagOnMark(activePendingId, targetCategory);
-          } else {
-            addPendingMark(targetCategory);
-          }
+          addPendingMark(targetCategory);
           return;
         }
       }
