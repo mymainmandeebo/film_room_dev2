@@ -543,10 +543,18 @@
       position: absolute;
       left: 12px;
       right: 12px;
-      bottom: 12px;
       z-index: 20;
       max-width: calc(100% - 24px);
       box-sizing: border-box;
+      transition: top 0.2s cubic-bezier(0.4, 0, 0.2, 1), bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+    }
+    #videoControlsOverlay.dock-bottom {
+      bottom: 12px;
+      top: auto;
+    }
+    #videoControlsOverlay.dock-top {
+      top: 12px;
+      bottom: auto;
     }
     #videoControlsOverlay button,
     #videoControlsOverlay input,
@@ -561,11 +569,16 @@
       #videoControlsOverlay {
         left: 8px;
         right: 8px;
-        bottom: 8px;
         max-width: calc(100% - 16px);
         padding: 8px;
         border-radius: 16px;
         gap: 6px;
+      }
+      #videoControlsOverlay.dock-bottom {
+        bottom: 8px;
+      }
+      #videoControlsOverlay.dock-top {
+        top: 8px;
       }
       #videoControlsOverlay > div {
         flex-wrap: wrap;
@@ -1397,7 +1410,7 @@
           <canvas id="telestrationCanvas" class="absolute top-0 left-0 w-full h-full z-10"></canvas>
         
           <!-- Overlay Controls Bar -->
-          <div id="videoControlsOverlay" class="absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2.5 px-4 py-2 rounded-[28px] bg-black/60 dark:bg-black/75 backdrop-blur-md border border-white/15 text-white shadow-md-3 transition-opacity duration-200">
+          <div id="videoControlsOverlay" class="dock-bottom absolute left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2.5 px-4 py-2 rounded-[28px] bg-black/60 dark:bg-black/75 backdrop-blur-md border border-white/15 text-white shadow-md-3">
             <!-- Left: Playback & Tagging Actions -->
             <div class="flex items-center gap-1.5">
               <button id="jumpBackBtn" class="p-2 rounded-full hover:bg-white/10 transition text-white/90" title="Jump back 5s">
@@ -1445,6 +1458,10 @@
                 <input type="range" id="overlayOpacitySlider" min="0.15" max="1" step="0.05" value="1" class="w-16 sm:w-20 md-slider bg-white/30 accent-white">
                 <span id="overlayOpacityPct" class="font-mono text-xs text-white/80 w-8 text-right hidden sm:inline">100%</span>
               </div>
+
+              <button type="button" id="toggleOverlayDockBtn" class="p-1.5 rounded-full hover:bg-white/10 transition text-white/90 flex items-center justify-center" title="Move overlay to top / bottom">
+                <span id="toggleOverlayDockIcon" class="material-symbols-outlined" style="font-size: 20px;">vertical_align_top</span>
+              </button>
             </div>
 
             <!-- Overlay Timeline Scrubber (mirrors the main timeline below the video) -->
@@ -3473,6 +3490,34 @@
       const savedOpacity = parseFloat(localStorage.getItem('videoControlsOpacity'));
       applyOverlayOpacity(isNaN(savedOpacity) ? 1 : savedOpacity);
       overlayOpacitySlider.addEventListener('input', (e) => applyOverlayOpacity(e.target.value));
+    }
+
+    // --- Overlay Dock Position (Top / Bottom) ---
+    const toggleOverlayDockBtn = document.getElementById('toggleOverlayDockBtn');
+    const toggleOverlayDockIcon = document.getElementById('toggleOverlayDockIcon');
+
+    function setOverlayDockPosition(pos) {
+      const isTop = pos === 'top';
+      if (!videoControlsOverlay) return;
+      videoControlsOverlay.classList.toggle('dock-top', isTop);
+      videoControlsOverlay.classList.toggle('dock-bottom', !isTop);
+      if (toggleOverlayDockIcon) {
+        toggleOverlayDockIcon.innerText = isTop ? 'vertical_align_bottom' : 'vertical_align_top';
+      }
+      if (toggleOverlayDockBtn) {
+        toggleOverlayDockBtn.title = isTop ? 'Move overlay to bottom' : 'Move overlay to top';
+      }
+      localStorage.setItem('videoOverlayDockPosition', isTop ? 'top' : 'bottom');
+    }
+
+    const savedOverlayDock = localStorage.getItem('videoOverlayDockPosition') || 'bottom';
+    setOverlayDockPosition(savedOverlayDock);
+
+    if (toggleOverlayDockBtn) {
+      toggleOverlayDockBtn.addEventListener('click', () => {
+        const currentIsTop = videoControlsOverlay && videoControlsOverlay.classList.contains('dock-top');
+        setOverlayDockPosition(currentIsTop ? 'bottom' : 'top');
+      });
     }
 
     video.volume = savedVolume;
