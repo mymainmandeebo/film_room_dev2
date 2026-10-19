@@ -1400,6 +1400,10 @@
               <img id="activeRosterLogoImg" src="" alt="" class="w-4 h-4 rounded-full object-cover hidden">
               <span id="activeRosterText"></span>
             </span>
+            <button onclick="launchProjectTheaterMode()" class="md-btn-filled bg-md-tertiary dark:bg-md-dark-tertiary text-md-on-tertiary dark:text-md-dark-on-tertiary !py-1 !px-3 !text-xs flex items-center gap-1 shadow-sm" title="Present all saved clips for this game in theater mode">
+              <span class="material-symbols-outlined" style="font-size: 16px;">play_arrow</span>
+              Theater Mode
+            </button>
           </div>
         </div>
         <div class="bg-md-surface-container-lowest dark:bg-md-dark-surface-container-lowest border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-lg px-4 py-2.5 flex flex-col gap-2 shadow-sm">
@@ -1595,6 +1599,9 @@
           <div class="flex flex-col gap-2 pb-3 border-b border-md-outline-variant dark:border-md-dark-outline-variant">
             <div class="flex gap-2">
               <select id="clipFilter" class="flex-1 bg-md-surface-container-high dark:bg-md-dark-surface-container-high border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-sm px-3 py-2 text-sm text-md-on-surface dark:text-md-dark-on-surface font-medium"></select>
+              <button onclick="launchProjectTheaterMode()" class="md-btn-filled bg-md-tertiary dark:bg-md-dark-tertiary text-md-on-tertiary dark:text-md-dark-tertiary !py-2 !px-3 !rounded-md-sm flex items-center gap-1" title="Present all saved clips in theater mode">
+                <span class="material-symbols-outlined" style="font-size: 18px;">play_arrow</span>
+              </button>
               <button id="exportZipBtn" class="md-btn-filled bg-md-tertiary dark:bg-md-dark-tertiary text-md-on-tertiary dark:text-md-dark-on-tertiary !py-2 !px-3 !rounded-md-sm" title="Export ZIP">
                 <span class="material-symbols-outlined" style="font-size: 20px;">folder_zip</span>
               </button>
@@ -3067,6 +3074,24 @@
       theaterClips = data.clips;
       theaterCurrentIdx = 0;
       document.getElementById('theaterReelTitle').innerText = data.reel.title;
+      document.getElementById('theaterModal').classList.remove('hidden');
+
+      theaterVideo.volume = savedVolume;
+      theaterVideo.muted = isMuted;
+      updateTheaterVolumeDisplay();
+
+      playTheaterClip(theaterCurrentIdx);
+    };
+
+    // --- Launch Project Theater Mode for All Saved Clips ---
+    window.launchProjectTheaterMode = () => {
+      if (!cachedClips || cachedClips.length === 0) {
+        return alert("No saved clips available in this film session to present in theater mode.");
+      }
+      const proj = getCurrentProject();
+      theaterClips = [...cachedClips];
+      theaterCurrentIdx = 0;
+      document.getElementById('theaterReelTitle').innerText = proj ? proj.name : "Game Film Review";
       document.getElementById('theaterModal').classList.remove('hidden');
 
       theaterVideo.volume = savedVolume;
