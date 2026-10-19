@@ -4954,8 +4954,8 @@
                 ${categories.map(c => {
                   const isChecked = markCats.includes(c);
                   return `
-                    <button type="button" onclick="toggleTagOnMark('${m.id}', '${c}')" class="md-chip ${isChecked ? 'selected bg-md-primary dark:bg-md-dark-primary text-md-on-primary dark:text-md-dark-on-primary border-transparent' : 'bg-md-surface-container-high dark:bg-md-dark-surface-container-high text-md-on-surface-variant dark:text-md-dark-on-surface-variant border-md-outline dark:border-md-dark-outline'}">
-                      <span class="material-symbols-outlined" style="font-size: 14px;">${isChecked ? 'check' : 'add'}</span>
+                    <button type="button" onclick="toggleTagOnMark('${m.id}', '${c}')" class="md-chip ${isChecked ? 'selected bg-md-primary dark:bg-md-dark-primary text-md-on-primary dark:text-md-dark-on-primary border-transparent' : 'bg-md-surface-container-high dark:bg-md-dark-surface-container-high text-md-on-surface-variant dark:text-md-dark-on-surface-variant border-md-outline dark:border-md-dark-outline'} !py-0.5 !px-2 !text-xs !gap-1">
+                      <span class="material-symbols-outlined" style="font-size: 12px;">${isChecked ? 'check' : 'add'}</span>
                       <span>${c}</span>
                     </button>
                   `;
@@ -4969,8 +4969,8 @@
                 ${rosterPlayers.map(p => {
                   const isChecked = markPlayers.includes(p);
                   return `
-                    <button type="button" onclick="togglePlayerOnMark('${m.id}', '${p}')" class="md-chip ${isChecked ? 'selected bg-md-tertiary dark:bg-md-dark-tertiary text-md-on-tertiary dark:text-md-dark-on-tertiary border-transparent' : 'bg-md-surface-container-high dark:bg-md-dark-surface-container-high text-md-on-surface-variant dark:text-md-dark-on-surface-variant border-md-outline dark:border-md-dark-outline'}">
-                      <span class="material-symbols-outlined" style="font-size: 14px;">${isChecked ? 'check' : 'add'}</span>
+                    <button type="button" onclick="togglePlayerOnMark('${m.id}', '${p}')" class="md-chip ${isChecked ? 'selected bg-md-tertiary dark:bg-md-dark-tertiary text-md-on-tertiary dark:text-md-dark-on-tertiary border-transparent' : 'bg-md-surface-container-high dark:bg-md-dark-surface-container-high text-md-on-surface-variant dark:text-md-dark-on-surface-variant border-md-outline dark:border-md-dark-outline'} !py-0.5 !px-2 !text-xs !gap-1">
+                      <span class="material-symbols-outlined" style="font-size: 12px;">${isChecked ? 'check' : 'add'}</span>
                       <span>${p}</span>
                     </button>
                   `;
