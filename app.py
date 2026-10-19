@@ -1371,7 +1371,10 @@ def perform_automated_backup():
         backups = sorted(BACKUPS_DIR.glob("auto_backup_*.zip"))
         if len(backups) > 7:
             for old_b in backups[:-7]:
-                try: old_b.unlink() except Exception: pass
+                try:
+                    old_b.unlink()
+                except Exception:
+                    pass
     except Exception as e:
         print(f"Automated backup error: {e}")
 
