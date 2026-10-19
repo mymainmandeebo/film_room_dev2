@@ -1373,9 +1373,9 @@
       <div class="w-full lg:col-span-8 flex flex-col gap-3">
         <div class="flex flex-wrap items-center justify-between bg-md-surface-container-lowest dark:bg-md-dark-surface-container-lowest border border-md-outline-variant dark:border-md-dark-outline-variant rounded-md-lg px-4 py-2.5 gap-2 shadow-sm">
           <div class="flex items-center gap-3 overflow-hidden">
-            <button onclick="switchView('projects')" class="md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant !py-1.5 !px-3 !text-sm !rounded-full">
-              <span class="material-symbols-outlined" style="font-size: 18px;">arrow_back</span>
-              Back
+            <button id="workspaceBackBtn" onclick="handleWorkspaceBack()" class="md-btn-text text-md-on-surface-variant dark:text-md-dark-on-surface-variant !py-1.5 !px-3 !text-sm !rounded-full">
+              <span class="material-symbols-outlined" id="workspaceBackIcon" style="font-size: 18px;">arrow_back</span>
+              <span id="workspaceBackText">Back</span>
             </button>
             <span id="activeProjectNameDisplay" class="text-base font-medium text-md-tertiary dark:text-md-dark-tertiary truncate"></span>
           </div>
@@ -1665,6 +1665,9 @@
     let currentClipToReel = null;
     let selectedProfilePlayer = null;
     let playerPhotos = {};
+
+    let isViewingClip = false;
+    let returnGameTime = 0;
 
     let editingClipId = null;
     let editModalSelectedCategories = [];
@@ -2108,6 +2111,8 @@
 
     function switchView(viewName) {
       if (viewName === 'projects') {
+        isViewingClip = false;
+        updateBackButtonUI();
         projectsHubView.style.display = 'block';
         playerProfileView.style.display = 'none';
         workspaceView.style.display = 'none';
@@ -2952,6 +2957,38 @@
     theaterVolumeSlider.addEventListener('input', (e) => setTheaterVolume(parseFloat(e.target.value)));
     theaterMuteBtn.addEventListener('click', toggleTheaterMute);
 
+    function updateBackButtonUI() {
+      const iconEl = document.getElementById('workspaceBackIcon');
+      const textEl = document.getElementById('workspaceBackText');
+      if (!iconEl || !textEl) return;
+      if (isViewingClip) {
+        iconEl.innerText = 'arrow_back';
+        textEl.innerText = 'Back to Film';
+      } else {
+        iconEl.innerText = 'arrow_back';
+        textEl.innerText = 'Back';
+      }
+    }
+
+    window.handleWorkspaceBack = () => {
+      if (isViewingClip && currentProjectId) {
+        const proj = getCurrentProject();
+        if (proj && proj.video_filename) {
+          video.src = `/media/uploads/${proj.video_filename}`;
+          video.currentTime = returnGameTime;
+          video.volume = savedVolume;
+          video.muted = isMuted;
+          updateVolumeDisplay();
+          updateTimelineMarkerOverlay(activePendingId ? pendingMarks.find(m => m.id === activePendingId) : null);
+          video.pause();
+        }
+        isViewingClip = false;
+        updateBackButtonUI();
+      } else {
+        switchView('projects');
+      }
+    };
+
     // --- Universal Clip Player Bridge ---
     window.playClip = (url, title = "Play Clip") => {
       if (!url) return;
@@ -2959,6 +2996,11 @@
       const workspaceIsActive = (document.getElementById('workspaceView').style.display !== 'none');
       
       if (workspaceIsActive) {
+        if (!isViewingClip) {
+          returnGameTime = video.currentTime;
+        }
+        isViewingClip = true;
+        updateBackButtonUI();
         video.src = url;
         video.volume = savedVolume;
         video.muted = isMuted;
@@ -4205,6 +4247,8 @@
       currentProjectId = projId;
       const proj = getCurrentProject();
       if (!proj) return;
+      isViewingClip = false;
+      updateBackButtonUI();
 
       document.getElementById('activeProjectNameDisplay').innerText = proj.name;
 
