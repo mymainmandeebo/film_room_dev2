@@ -33,9 +33,10 @@ CLIPS_DIR = DATA_DIR / "clips"
 REELS_DIR = DATA_DIR / "reels"
 PLAYERS_DIR = DATA_DIR / "players"
 LOGOS_DIR = DATA_DIR / "logos"
+BACKUPS_DIR = DATA_DIR / "automated_backups"
 DB_FILE = DATA_DIR / "store.json"
 
-for folder in [UPLOAD_DIR, CLIPS_DIR, REELS_DIR, PLAYERS_DIR, LOGOS_DIR]:
+for folder in [UPLOAD_DIR, CLIPS_DIR, REELS_DIR, PLAYERS_DIR, LOGOS_DIR, BACKUPS_DIR]:
     folder.mkdir(parents=True, exist_ok=True)
 
 security = HTTPBearer()
@@ -105,7 +106,11 @@ def init_db():
             ],
             "clips": [],
             "reels": [],
-            "player_photos": {}
+            "player_photos": {},
+            "settings": {
+                "auto_daily_backup": False,
+                "last_daily_backup": 0
+            }
         }
         with open(DB_FILE, "w") as f:
             json.dump(default_data, f, indent=2)
@@ -121,6 +126,7 @@ def read_db():
             for r in data.get("rosters", []):
                 r.setdefault("logo_url", None)
             data.setdefault("player_photos", {})
+            data.setdefault("settings", {"auto_daily_backup": False, "last_daily_backup": 0})
             for p in data.get("projects", []):
                 p.setdefault("sport", "Basketball")
             for c in data.get("clips", []):
@@ -1301,3 +1307,79 @@ def export_project_clips_zip(project_id: str, category: Optional[str] = None, us
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{zip_filename}"'}
     )
+
+# --- Automated Daily Backup Settings & Scheduler ---
+class SettingsUpdatePayload(BaseModel):
+    auto_daily_backup: bool
+
+@app.get("/api/admin/settings")
+def get_settings(user: dict = Depends(get_current_user)):
+    if user["role"] not in ["admin", "coach"]:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    db = read_db()
+    return db.get("settings", {"auto_daily_backup": False, "last_daily_backup": 0})
+
+@app.put("/api/admin/settings")
+def update_settings(payload: SettingsUpdatePayload, user: dict = Depends(get_current_user)):
+    if user["role"] not in ["admin", "coach"]:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    db = read_db()
+    settings = db.setdefault("settings", {})
+    settings["auto_daily_backup"] = payload.auto_daily_backup
+    write_db(db)
+    return {"status": "updated", "settings": settings}
+
+def perform_automated_backup():
+    try:
+        db = read_db()
+        settings = db.get("settings", {})
+        if not settings.get("auto_daily_backup", False):
+            return
+
+        last_backup = settings.get("last_daily_backup", 0)
+        current_time = time.time()
+        if current_time - last_backup < 86400:
+            return
+
+        backup_buffer = io.BytesIO()
+        with zipfile.ZipFile(backup_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            if DB_FILE.exists():
+                zf.write(DB_FILE, arcname="store.json")
+
+            media_dirs = {
+                "clips": CLIPS_DIR,
+                "reels": REELS_DIR,
+                "players": PLAYERS_DIR,
+                "logos": LOGOS_DIR,
+            }
+            for arc_prefix, folder in media_dirs.items():
+                if not folder.exists():
+                    continue
+                for file_path in folder.rglob("*"):
+                    if file_path.is_file():
+                        rel = file_path.relative_to(folder)
+                        zf.write(file_path, arcname=f"media/{arc_prefix}/{rel.as_posix()}")
+
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        backup_path = BACKUPS_DIR / f"auto_backup_{stamp}.zip"
+        with open(backup_path, "wb") as f:
+            f.write(backup_buffer.getvalue())
+
+        db["settings"]["last_daily_backup"] = int(current_time)
+        write_db(db)
+
+        backups = sorted(BACKUPS_DIR.glob("auto_backup_*.zip"))
+        if len(backups) > 7:
+            for old_b in backups[:-7]:
+                try: old_b.unlink() except Exception: pass
+    except Exception as e:
+        print(f"Automated backup error: {e}")
+
+async def backup_scheduler_loop():
+    while True:
+        await asyncio.sleep(3600)
+        perform_automated_backup()
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(backup_scheduler_loop())

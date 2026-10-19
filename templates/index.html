@@ -1123,6 +1123,19 @@
         </div>
       </div>
 
+      <!-- Automated Daily Backup Setting -->
+      <div class="pb-4 border-b border-md-outline-variant dark:border-md-dark-outline-variant">
+        <h4 class="text-sm font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant uppercase tracking-wider flex items-center gap-1.5 mb-2">
+          <span class="material-symbols-outlined" style="font-size: 16px;">schedule</span>
+          Automated Daily Backup
+        </h4>
+        <label class="md-checkbox">
+          <input type="checkbox" id="autoBackupCheckbox">
+          <span class="md-checkbox-box border-md-outline dark:border-md-dark-outline bg-md-surface-container-high dark:bg-md-dark-surface-container-high text-md-on-primary dark:text-md-dark-on-primary checked:bg-md-primary dark:checked:bg-md-dark-primary checked:border-transparent"></span>
+          <span class="text-sm font-medium text-md-on-surface dark:text-md-dark-on-surface">Enable automated daily local ZIP backup of clips and data store</span>
+        </label>
+      </div>
+
       <!-- Backup & Restore -->
       <div id="backupRestoreSection" class="pb-4 border-b border-md-outline-variant dark:border-md-dark-outline-variant hidden">
         <h4 class="text-sm font-medium text-md-on-surface-variant dark:text-md-dark-on-surface-variant uppercase tracking-wider flex items-center gap-1.5 mb-2">
@@ -3820,6 +3833,14 @@
           backupSection.classList.add('hidden');
         }
       }
+      try {
+        const resSettings = await fetch('/api/admin/settings', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (resSettings.ok) {
+          const st = await resSettings.json();
+          const cb = document.getElementById('autoBackupCheckbox');
+          if (cb) cb.checked = !!st.auto_daily_backup;
+        }
+      } catch (e) {}
       document.getElementById('settingsModal').classList.remove('hidden');
     };
     document.getElementById('closeSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.add('hidden');
@@ -3837,6 +3858,15 @@
       });
       savePendingMarks();
       renderPendingMarks();
+
+      const autoBackupChecked = document.getElementById('autoBackupCheckbox')?.checked || false;
+      try {
+        await fetch('/api/admin/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ auto_daily_backup: autoBackupChecked })
+        });
+      } catch (e) {}
 
       showExportToast(`Saved ${settingsEditingSport} Play Types`, "Preferences updated.", false);
       setTimeout(hideExportToast, 2000);
