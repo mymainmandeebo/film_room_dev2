@@ -1523,6 +1523,11 @@
             <span>Draw</span>
           </button>
 
+          <button type="button" id="qtQuickModeBtn" class="quick-toggle-btn active" title="Toggle Quick Mode (Mark without stopping video playback)">
+            <span class="material-symbols-outlined">bolt</span>
+            <span>Quick Mode</span>
+          </button>
+
           <button type="button" id="qtLoopBtn" class="quick-toggle-btn" title="Loop the current video or clip">
             <span class="material-symbols-outlined">repeat</span>
             <span>Loop</span>
@@ -2023,6 +2028,7 @@
     let leadoutSeconds = parseFloat(localStorage.getItem('leadoutSeconds')) || 3;
 
     // Quick-toggle state
+    let quickModeEnabled = localStorage.getItem('analyzerQuickMode') !== 'false';
     let qtLoopEnabled = false;
     let qtPipActive = false;
 
@@ -3548,6 +3554,16 @@
           });
         }
 
+        const quickModeBtn = document.getElementById('qtQuickModeBtn');
+        if (quickModeBtn) {
+          quickModeBtn.classList.toggle('active', quickModeEnabled);
+          quickModeBtn.addEventListener('click', () => {
+            quickModeEnabled = !quickModeEnabled;
+            quickModeBtn.classList.toggle('active', quickModeEnabled);
+            localStorage.setItem('analyzerQuickMode', quickModeEnabled);
+          });
+        }
+
         if (loopBtn) {
           loopBtn.addEventListener('click', () => {
             qtLoopEnabled = !qtLoopEnabled;
@@ -3645,6 +3661,9 @@
       },
 
       reset() {
+        quickModeEnabled = true;
+        const qmBtn = document.getElementById('qtQuickModeBtn');
+        if (qmBtn) qmBtn.classList.add('active');
         // Turn off loop
         qtLoopEnabled = false;
         video.loop = false;
@@ -4824,7 +4843,24 @@
       renderPendingMarks();
       
       tabPendingMarksBtn.click();
-      seekToStartOfMark(newMark.id);
+
+      if (!quickModeEnabled) {
+        seekToStartOfMark(newMark.id);
+      } else {
+        // In Quick Mode, add to pending without pausing/seeking the main video
+        activePendingId = newMark.id;
+        updateTimelineMarkerOverlay(newMark);
+        syncPlayTypeQuickToggleState();
+        document.querySelectorAll('#pendingMarksList > div').forEach(c => {
+          c.classList.remove('border-md-tertiary', 'ring-2', 'ring-md-tertiary');
+          c.classList.add('border-md-outline-variant', 'dark:border-md-dark-outline-variant');
+        });
+        const el = document.getElementById(`card_${newMark.id}`);
+        if (el) {
+          el.classList.remove('border-md-outline-variant', 'dark:border-md-dark-outline-variant');
+          el.classList.add('border-md-tertiary', 'ring-2', 'ring-md-tertiary');
+        }
+      }
     }
 
     document.getElementById('markEventBtn').onclick = () => addPendingMark();
