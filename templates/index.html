@@ -3435,21 +3435,250 @@
       switchView('workspace');
     };
 
-    const UploadManager = {
-      tasks: [],
-      init() {},
-      getTaskByProject(projId) {
-        return this.tasks.find(t => t.projectId === projId && (t.status === 'uploading' || t.status === 'processing'));
-      },
-      startUpload(projectId, projectName, file) {
-        alert("Upload starting for " + projectName);
+  const UploadManager = {
+    tasks: {},
+
+    getTaskByProject(projId) {
+      const t = this.tasks[projId];
+      return (t && (t.status === 'uploading' || t.status === 'processing')) ? t : null;
+    },
+
+    startUpload(projectId, projectName, file) {
+      if (this.getTaskByProject(projectId)) return; // already in progress
+
+      const task = {
+        projectId,
+        projectName,
+        file,
+        status: 'uploading',
+        percent: 0,
+        bytesSent: 0,
+        totalBytes: file.size,
+        speedBytesPerSec: 0,
+        xhr: null
+      };
+      this.tasks[projectId] = task;
+
+      this._showDock();
+
+      const xhr = new XMLHttpRequest();
+      task.xhr = xhr;
+
+      let lastLoaded = 0;
+      let lastTime = Date.now();
+
+      xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+        const now = Date.now();
+        const dt = (now - lastTime) / 1000;
+        task.bytesSent = e.loaded;
+        task.totalBytes = e.total;
+        task.percent = Math.round((e.loaded / e.total) * 100);
+        if (dt > 0.2) {
+          task.speedBytesPerSec = (e.loaded - lastLoaded) / dt;
+          lastLoaded = e.loaded;
+          lastTime = now;
+        }
+        this._refreshUI();
+      };
+
+      xhr.onload = async () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          task.status = 'done';
+          this._refreshUI();
+          await loadProjects();
+          // If the workspace is open for this project, reload the video
+          if (currentProjectId === projectId) {
+            const proj = projects.find(p => p.id === projectId);
+            if (proj && proj.video_filename) {
+              video.src = `/media/uploads/${proj.video_filename}`;
+              video.volume = savedVolume;
+              video.muted = isMuted;
+              updateVolumeDisplay();
+              document.getElementById('noVideoMsg').classList.add('hidden');
+            }
+          }
+          setTimeout(() => {
+            delete this.tasks[projectId];
+            this._refreshUI();
+          }, 3000);
+        } else {
+          task.status = 'error';
+          task.errorMsg = `Server error ${xhr.status}`;
+          this._refreshUI();
+        }
+    };
+
+    xhr.onerror = () => {
+      task.status = 'error';
+      task.errorMsg = 'Network error';
+      this._refreshUI();
+    };
+
+    xhr.onabort = () => {
+      task.status = 'cancelled';
+      this._refreshUI();
+      setTimeout(() => {
+        delete this.tasks[projectId];
+        this._refreshUI();
+      }, 1500);
+    };
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    xhr.open('POST', `/api/projects/${projectId}/upload`);
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.send(formData);
+
+    // Also wire up the in-workspace progress UI if workspace is open
+    if (currentProjectId === projectId) {
+      this._bindWorkspaceProgressUI(task);
+    }
+  },
+
+  cancelUpload(projectId) {
+    const t = this.tasks[projectId];
+    if (t && t.xhr) t.xhr.abort();
+  },
+
+  _bindWorkspaceProgressUI(task) {
+    const box = document.getElementById('uploadProgressBox');
+    if (!box) return;
+    box.classList.remove('hidden');
+    document.getElementById('workspaceCancelUploadBtn').onclick = () => this.cancelUpload(task.projectId);
+
+    const tick = () => {
+      if (!this.tasks[task.projectId]) { box.classList.add('hidden'); return; }
+      const t = this.tasks[task.projectId];
+      const pct = t.percent || 0;
+      document.getElementById('uploadProgressBar').style.width = pct + '%';
+      document.getElementById('uploadPercentText').innerText = pct + '%';
+      document.getElementById('uploadBytesText').innerText =
+        `${(t.bytesSent / 1048576).toFixed(1)} MB / ${(t.totalBytes / 1048576).toFixed(1)} MB`;
+      document.getElementById('uploadSpeedText').innerText =
+        `${(t.speedBytesPerSec / 1048576).toFixed(1)} MB/s`;
+      if (t.status === 'uploading' || t.status === 'processing') {
+        document.getElementById('uploadStatusText').innerText = 'Uploading…';
+        requestAnimationFrame(tick);
+      } else if (t.status === 'done') {
+        document.getElementById('uploadStatusText').innerText = 'Complete!';
+        setTimeout(() => box.classList.add('hidden'), 2000);
+      } else {
+        document.getElementById('uploadStatusText').innerText = t.errorMsg || 'Upload ended';
+        setTimeout(() => box.classList.add('hidden'), 3000);
       }
     };
+    requestAnimationFrame(tick);
+  },
+
+  _showDock() {
+    const dock = document.getElementById('backgroundUploadDock');
+    if (dock) dock.classList.remove('hidden');
+    const expandBtn = document.getElementById('pillExpandBtn');
+    const cardCollapseBtn = document.getElementById('cardCollapseBtn');
+    const pill = document.getElementById('uploadDockPill');
+    const card = document.getElementById('uploadDockCard');
+    if (expandBtn) expandBtn.onclick = () => { pill.classList.add('hidden'); card.classList.remove('hidden'); };
+    if (cardCollapseBtn) cardCollapseBtn.onclick = () => { card.classList.add('hidden'); pill.classList.remove('hidden'); };
+  },
+
+  _refreshUI() {
+    const activeTasks = Object.values(this.tasks);
+    const dock = document.getElementById('backgroundUploadDock');
+    if (!dock) return;
+
+    if (activeTasks.length === 0) {
+      dock.classList.add('hidden');
+      return;
+    }
+
+    dock.classList.remove('hidden');
+
+    // Update the pill summary with the first active task
+    const t = activeTasks[0];
+    document.getElementById('pillTitle').innerText =
+      t.status === 'done' ? `✓ ${t.projectName}` :
+      t.status === 'error' ? `✗ ${t.projectName}` :
+      `Uploading: ${t.projectName}`;
+    document.getElementById('pillSubtitle').innerText =
+      t.status === 'done' ? 'Upload complete' :
+      t.status === 'error' ? (t.errorMsg || 'Error') :
+      `${t.percent}% • ${(t.speedBytesPerSec / 1048576).toFixed(1)} MB/s`;
+
+    // Render task list in expanded card
+    const list = document.getElementById('uploadTasksList');
+    if (!list) return;
+    list.innerHTML = activeTasks.map(task => `
+      <div class="flex flex-col gap-1.5">
+        <div class="flex justify-between text-xs font-medium">
+          <span class="text-md-on-surface dark:text-md-dark-on-surface truncate max-w-[180px]">${task.projectName}</span>
+          <span class="font-mono text-md-primary dark:text-md-dark-primary">${task.percent}%</span>
+        </div>
+        <div class="w-full h-1.5 bg-md-surface-container-highest dark:bg-md-dark-surface-container-highest rounded-full overflow-hidden">
+          <div class="h-full bg-md-primary dark:bg-md-dark-primary rounded-full transition-all"
+               style="width: ${task.percent}%"></div>
+        </div>
+        <div class="flex justify-between text-[11px] font-mono text-md-on-surface-variant dark:text-md-dark-on-surface-variant">
+          <span>${(task.bytesSent / 1048576).toFixed(1)} / ${(task.totalBytes / 1048576).toFixed(1)} MB</span>
+          <span>${(task.speedBytesPerSec / 1048576).toFixed(1)} MB/s</span>
+          ${task.status === 'uploading' ? `<button onclick="UploadManager.cancelUpload('${task.projectId}')" class="text-md-error dark:text-md-dark-error hover:underline">Cancel</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+};
 
     window.onDashboardFileSelected = (event, projectId, projectName) => {
       const file = event.target.files[0];
       if (file && projectId) UploadManager.startUpload(projectId, projectName, file);
     };
+
+    // ---- Workspace video file input (FIX: upload from inside the Film Room) ----
+    document.getElementById('videoFileInput').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file || !currentProjectId) return;
+      const proj = getCurrentProject();
+      UploadManager.startUpload(currentProjectId, proj ? proj.name : 'Game Video', file);
+      e.target.value = ''; // allow re-selecting the same file later
+    });
+
+    // ---- Drag & drop onto the video container (FIX: advertised drag/drop now works) ----
+    const videoContainerEl = document.getElementById('videoContainer');
+    ['dragenter', 'dragover'].forEach(evt => {
+      videoContainerEl.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        videoContainerEl.classList.add('drag-over');
+      });
+    });
+    ['dragleave', 'dragend'].forEach(evt => {
+      videoContainerEl.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        videoContainerEl.classList.remove('drag-over');
+      });
+    });
+    videoContainerEl.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      videoContainerEl.classList.remove('drag-over');
+
+      if (!currentProjectId) return;
+      const file = e.dataTransfer?.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith('video/') && !/\.(mp4|mov|webm|mkv|m4v)$/i.test(file.name)) {
+        alert('Please drop a video file.');
+        return;
+      }
+      const proj = getCurrentProject();
+      UploadManager.startUpload(currentProjectId, proj ? proj.name : 'Game Video', file);
+    });
+
+    // Safety: clear any stuck drag-over highlight if a drag ends outside the container
+    document.addEventListener('dragend', () => {
+      document.getElementById('videoContainer')?.classList.remove('drag-over');
+    });
 
     function formatTime(s) {
       if (isNaN(s)) return "00:00.00";
