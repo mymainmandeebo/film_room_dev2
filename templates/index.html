@@ -3484,30 +3484,25 @@
 
       xhr.onload = async () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          task.status = 'done';
-          this._refreshUI();
-          await loadProjects();
-          // If the workspace is open for this project, reload the video
-          if (currentProjectId === projectId) {
-            const proj = projects.find(p => p.id === projectId);
-            if (proj && proj.video_filename) {
-              video.src = `/media/uploads/${proj.video_filename}`;
-              video.volume = savedVolume;
-              video.muted = isMuted;
-              updateVolumeDisplay();
-              document.getElementById('noVideoMsg').classList.add('hidden');
-            }
-          }
-          setTimeout(() => {
-            delete this.tasks[projectId];
-            this._refreshUI();
-          }, 3000);
+          // ...existing success path...
         } else {
           task.status = 'error';
-          task.errorMsg = `Server error ${xhr.status}`;
+          let detail = `Server error ${xhr.status}`;
+          try {
+            const body = JSON.parse(xhr.responseText);
+            detail = `Server ${xhr.status}: ${body.detail || body.message || xhr.responseText}`;
+          } catch {
+            if (xhr.responseText) detail += ` — ${xhr.responseText.slice(0, 120)}`;
+          }
+          task.errorMsg = detail;
+          console.error('[upload] failed', {
+            url: xhr.responseURL || `/api/projects/${projectId}/upload`,
+            status: xhr.status,
+            body: xhr.responseText
+          });
           this._refreshUI();
         }
-    };
+      };
 
     xhr.onerror = () => {
       task.status = 'error';
